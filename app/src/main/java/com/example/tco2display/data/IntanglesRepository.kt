@@ -2,10 +2,12 @@ package com.example.tco2display.data
 
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import kotlinx.serialization.json.*
+import okhttp3.ConnectionPool
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
+import java.util.concurrent.TimeUnit
 
 class IntanglesRepository {
 
@@ -21,7 +23,7 @@ class IntanglesRepository {
         isLenient = true
     }
 
-    private fun buildHeaders(token: String) = mapOf(
+    private fun baseHeaders(token: String) = mutableMapOf(
         "Accept" to "application/json, text/plain, */*",
         "intangles-session-type" to "web",
         "intangles-user-lang" to "en",
@@ -29,13 +31,21 @@ class IntanglesRepository {
         "intangles-user-tz" to "Asia/Calcutta",
         "Referer" to referer,
         "Origin" to origin,
-        "User-Agent" to "android-okhttp/4.x"
+        "User-Agent" to "android-okhttp/4.x",
+        // OkHttp adds gzip by default; adding here is harmless
+        "Accept-Encoding" to "gzip"
     )
 
     private val client: OkHttpClient by lazy {
         val log = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC }
         OkHttpClient.Builder()
             .addInterceptor(log)
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(7, TimeUnit.SECONDS)
+            .writeTimeout(7, TimeUnit.SECONDS)
+            .callTimeout(12, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .connectionPool(ConnectionPool(5, 30, TimeUnit.SECONDS))
             .build()
     }
 
@@ -48,10 +58,22 @@ class IntanglesRepository {
             .create(IntanglesApi::class.java)
     }
 
+    // ---------- Caches to avoid re-work on each 5s poll ----------
+    private var cachedFuelKey: String? = null
+
+    private data class PageCache(
+        val etag: String?,
+        val sum: Double,
+        val rowsSize: Int
+    )
+    private val pageCache = mutableMapOf<Int, PageCache>()
+
     /**
      * Streams pages and returns TOTAL tCO2 saved (in tonnes).
-     * Mirrors the Python behavior: detects the fuel key on first page, sums over pagination,
-     * converts LNG to kg (if needed), then multiplies by SAVINGS_PER_KG and divides by 1000.
+     * Fast path improvements:
+     *  - Cache fuel key once.
+     *  - Conditional GET per page via ETag (If-None-Match) – skips unchanged pages.
+     *  - Keep per-page sum to avoid reparsing.
      */
     suspend fun fetchAndSumTco2(
         token: String,
@@ -67,12 +89,15 @@ class IntanglesRepository {
         lngDensity: Double
     ): Double {
         var totalInput = 0.0
-        var fuelKey: String? = null
         var pnum = 1
 
         while (true) {
-            val payload = api.fuelConsumed(
-                headers = buildHeaders(token),
+            // Prepare headers with conditional ETag for this page (if known)
+            val headers = baseHeaders(token)
+            pageCache[pnum]?.etag?.let { headers["If-None-Match"] = it }
+
+            val resp = api.fuelConsumed(
+                headers = headers,
                 pnum = pnum,
                 psize = psize,
                 noDefaultFields = noDefaultFields,
@@ -84,24 +109,54 @@ class IntanglesRepository {
                 lang = lang
             )
 
-            val rows = iterPayloadRows(payload)
-            if (rows.isEmpty()) break
+            var rowsSizeForStopCheck: Int
+            var pageSum: Double
 
-            if (fuelKey == null) {
-                val sample = rows.take(10)
-                fuelKey = detectFuelKey(sample) ?: error("Could not detect a fuel field.")
+            if (resp.code() == 304) {
+                // Unchanged page – use cached sum/size
+                val cached = pageCache[pnum]
+                if (cached != null) {
+                    pageSum = cached.sum
+                    rowsSizeForStopCheck = cached.rowsSize
+                } else {
+                    // Shouldn't happen, fallback to 0 for safety
+                    pageSum = 0.0
+                    rowsSizeForStopCheck = psize // keep scanning
+                }
+            } else {
+                resp.errorBody()?.let {
+                    throw IllegalStateException("HTTP ${resp.code()} ${it.string().take(200)}")
+                }
+                val body = resp.body() ?: JsonNull
+
+                val rows = iterPayloadRows(body)
+                rowsSizeForStopCheck = rows.size
+
+                // Detect fuel key once (first successful page)
+                if (cachedFuelKey == null) {
+                    val sample = rows.take(10)
+                    cachedFuelKey = detectFuelKey(sample)
+                        ?: error("Could not detect a fuel field.")
+                }
+
+                // Sum page
+                pageSum = 0.0
+                val key = cachedFuelKey!!
+                for (row in rows) getValueByDotted(row, key)?.let { pageSum += it }
+
+                // Cache page (sum + rows size + ETag if provided)
+                val etag = resp.headers()["ETag"]
+                pageCache[pnum] = PageCache(etag = etag, sum = pageSum, rowsSize = rowsSizeForStopCheck)
             }
 
-            var pageSum = 0.0
-            for (row in rows) {
-                getValueByDotted(row, fuelKey!!)?.let { pageSum += it }
-            }
             totalInput += pageSum
 
-            if (rows.size < psize) break
+            // pagination end?
+            if (rowsSizeForStopCheck < psize) break
             pnum += 1
         }
 
+        // Convert to kg and compute tCO2 saved
         val totalLngKg = when (lngUnit.lowercase()) {
             "kg" -> totalInput
             "l", "lt", "litre", "liter" -> totalInput * lngDensity
@@ -112,10 +167,6 @@ class IntanglesRepository {
 
     // ------------------------ Helpers (mirror Python) ------------------------
 
-    /**
-     * Yield row-like JsonObjects from common API shapes.
-     * Supports: List<Obj>, { result: List/Obj }, { data: List/Obj }, or a single Obj.
-     */
     private fun iterPayloadRows(payload: JsonElement): List<JsonObject> = when (payload) {
         is JsonArray -> payload.mapNotNull { it as? JsonObject }
         is JsonObject -> {
@@ -127,7 +178,7 @@ class IntanglesRepository {
                     when (v) {
                         is JsonArray -> v.forEach { (it as? JsonObject)?.let(result::add) }
                         is JsonObject -> result.add(v)
-                        else -> { /* ignore non-object/list containers */ }
+                        else -> { /* ignore other types */ }
                     }
                 }
             }
@@ -146,10 +197,6 @@ class IntanglesRepository {
         "fuel"
     )
 
-    /**
-     * Walks all leaves and returns (dottedKey, valueElement).
-     * The 'else' branch keeps this exhaustive for sealed JsonElement hierarchy.
-     */
     private fun walkKeys(elem: JsonElement, prefix: String = ""): Sequence<Pair<String, JsonElement>> = sequence {
         when (elem) {
             is JsonObject -> for ((k, v) in elem) {
@@ -157,13 +204,10 @@ class IntanglesRepository {
                 yieldAll(walkKeys(v, nk))
             }
             is JsonArray -> for (v in elem) yieldAll(walkKeys(v, prefix))
-            else -> yield(prefix to elem) // handles JsonPrimitive (JsonLiteral/JsonNull) and any other leaf
+            else -> yield(prefix to elem)
         }
     }
 
-    /**
-     * Try to find a likely fuel key by preference and fuzzy match.
-     */
     private fun detectFuelKey(sampleRows: List<JsonObject>): String? {
         val lowers = buildSet {
             for (row in sampleRows) {
@@ -176,15 +220,11 @@ class IntanglesRepository {
         return lowers.firstOrNull { it.contains("fuel") && (it.contains("consum") || it.contains("total")) }
     }
 
-    /**
-     * Retrieve numeric value at dotted path; if strict lookup fails, deep-scan once.
-     */
     private fun getValueByDotted(row: JsonObject, dotted: String): Double? {
         fun getStrict(obj: JsonElement?, parts: List<String>, i: Int): JsonElement? {
             if (obj == null) return null
             if (i == parts.size) return obj
-            val p = parts[i]
-            return (obj as? JsonObject)?.get(p)?.let { getStrict(it, parts, i + 1) }
+            return (obj as? JsonObject)?.get(parts[i])?.let { getStrict(it, parts, i + 1) }
         }
         val parts = dotted.split(".")
         val strict = getStrict(row, parts, 0)
@@ -192,16 +232,8 @@ class IntanglesRepository {
         return (leaf as? JsonPrimitive)?.toDoubleOrNullRelaxed()
     }
 
-    /**
-     * Parse JsonPrimitive to Double:
-     *  - numeric primitives
-     *  - strings like "1,234.56"
-     */
     private fun JsonPrimitive.toDoubleOrNullRelaxed(): Double? {
-        return if (isString) {
-            this.content.trim().replace(",", "").toDoubleOrNull()
-        } else {
-            try { this.double } catch (_: Exception) { null }
-        }
+        return if (isString) content.trim().replace(",", "").toDoubleOrNull()
+        else try { double } catch (_: Exception) { null }
     }
 }
