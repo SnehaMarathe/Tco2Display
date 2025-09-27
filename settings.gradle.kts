@@ -1,3 +1,4 @@
+// <repo>/settings.gradle.kts
 pluginManagement {
     repositories {
         google()
@@ -14,3 +15,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Tco2Display"
 include(":app")
+
