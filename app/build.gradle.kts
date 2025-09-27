@@ -1,3 +1,4 @@
+// <repo>/app/build.gradle.kts  (module-level)
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -15,13 +16,18 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        buildConfigField("String", "INTANGLES_TOKEN", ""${project.findProperty("INTANGLES_TOKEN") ?: ""}"")
+        // Read token injected by CI into ~/.gradle/gradle.properties
+        val t = (project.findProperty("INTANGLES_TOKEN") as String?) ?: ""
+        buildConfigField("String", "INTANGLES_TOKEN", "\"$t\"")
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
         debug {
             isMinifyEnabled = false
