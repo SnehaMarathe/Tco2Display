@@ -1,0 +1,18 @@
+<resources>
+    <!-- Fullscreen, no action bar, draws into cutout, dark bars -->
+    <style name="Theme.Tco2Display" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Request fullscreen at the window level -->
+        <item name="android:windowFullscreen">true</item>
+
+        <!-- Draw into display cutout (landscape devices with notches) -->
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+
+        <!-- Keep bars dark if they ever appear transiently -->
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+
+        <!-- Avoid contrast overlays that can flash lighter bars -->
+        <item name="android:enforceStatusBarContrast">false</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
+    </style>
+</resources>
