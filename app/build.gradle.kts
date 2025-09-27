@@ -1,10 +1,3 @@
-// <repo>/app/build.gradle.kts  (module-level)
-plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.serialization")
-}
-
 android {
     namespace = "com.example.tco2display"
     compileSdk = 34
@@ -16,9 +9,14 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        // Read token injected by CI into ~/.gradle/gradle.properties
         val t = (project.findProperty("INTANGLES_TOKEN") as String?) ?: ""
         buildConfigField("String", "INTANGLES_TOKEN", "\"$t\"")
+    }
+
+    // ✅ Make Java compile target match Kotlin (both 17)
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     buildTypes {
@@ -29,9 +27,7 @@ android {
                 "proguard-rules.pro"
             )
         }
-        debug {
-            isMinifyEnabled = false
-        }
+        debug { isMinifyEnabled = false }
     }
 
     buildFeatures {
@@ -39,6 +35,8 @@ android {
         buildConfig = true
     }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
+
+    // You already had this; keep it
     kotlinOptions { jvmTarget = "17" }
 }
 
