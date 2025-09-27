@@ -1,8 +1,10 @@
+// <repo>/build.gradle.kts  (project-level)
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.serialization")
+    id("com.android.application") version "8.6.1" apply false
+    id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.24" apply false
 }
+
 
 android {
     namespace = "com.example.tco2display"
