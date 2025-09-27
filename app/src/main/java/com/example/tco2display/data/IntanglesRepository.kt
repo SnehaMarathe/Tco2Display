@@ -1,19 +1,20 @@
 package com.example.tco2display.data
 
+import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import kotlinx.serialization.json.*
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
-import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
-import kotlinx.serialization.json.Json
-import okhttp3.MediaType.Companion.toMediaType
 
 class IntanglesRepository {
 
-    private val SAVINGS_PER_KG = 0.926 // kg CO2 saved per kg LNG
+    // kg CO2 saved per kg LNG (to match platform)
+    private val SAVINGS_PER_KG = 0.926
+
     private val baseUrl = "https://apis.intangles.com"
     private val referer = "https://bemblueedge.intangles.com/"
-    private val origin  = "https://bemblueedge.intangles.com"
+    private val origin = "https://bemblueedge.intangles.com"
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -47,6 +48,11 @@ class IntanglesRepository {
             .create(IntanglesApi::class.java)
     }
 
+    /**
+     * Streams pages and returns TOTAL tCO2 saved (in tonnes).
+     * Mirrors the Python behavior: detects the fuel key on first page, sums over pagination,
+     * converts LNG to kg (if needed), then multiplies by SAVINGS_PER_KG and divides by 1000.
+     */
     suspend fun fetchAndSumTco2(
         token: String,
         accId: String,
@@ -99,11 +105,17 @@ class IntanglesRepository {
         val totalLngKg = when (lngUnit.lowercase()) {
             "kg" -> totalInput
             "l", "lt", "litre", "liter" -> totalInput * lngDensity
-            else -> error("Invalid lngUnit")
+            else -> error("Invalid lngUnit: $lngUnit")
         }
         return (totalLngKg * SAVINGS_PER_KG) / 1000.0
     }
 
+    // ------------------------ Helpers (mirror Python) ------------------------
+
+    /**
+     * Yield row-like JsonObjects from common API shapes.
+     * Supports: List<Obj>, { result: List/Obj }, { data: List/Obj }, or a single Obj.
+     */
     private fun iterPayloadRows(payload: JsonElement): List<JsonObject> = when (payload) {
         is JsonArray -> payload.mapNotNull { it as? JsonObject }
         is JsonObject -> {
@@ -115,6 +127,7 @@ class IntanglesRepository {
                     when (v) {
                         is JsonArray -> v.forEach { (it as? JsonObject)?.let(result::add) }
                         is JsonObject -> result.add(v)
+                        else -> { /* ignore non-object/list containers */ }
                     }
                 }
             }
@@ -133,6 +146,10 @@ class IntanglesRepository {
         "fuel"
     )
 
+    /**
+     * Walks all leaves and returns (dottedKey, valueElement).
+     * The 'else' branch keeps this exhaustive for sealed JsonElement hierarchy.
+     */
     private fun walkKeys(elem: JsonElement, prefix: String = ""): Sequence<Pair<String, JsonElement>> = sequence {
         when (elem) {
             is JsonObject -> for ((k, v) in elem) {
@@ -140,20 +157,28 @@ class IntanglesRepository {
                 yieldAll(walkKeys(v, nk))
             }
             is JsonArray -> for (v in elem) yieldAll(walkKeys(v, prefix))
-            else -> yield(prefix to elem)
+            else -> yield(prefix to elem) // handles JsonPrimitive (JsonLiteral/JsonNull) and any other leaf
         }
     }
 
+    /**
+     * Try to find a likely fuel key by preference and fuzzy match.
+     */
     private fun detectFuelKey(sampleRows: List<JsonObject>): String? {
         val lowers = buildSet {
-            for (row in sampleRows) for ((k, v) in walkKeys(row)) {
-                if (k.isNotBlank() && v is JsonPrimitive) add(k.lowercase())
+            for (row in sampleRows) {
+                for ((k, v) in walkKeys(row)) {
+                    if (k.isNotBlank() && v is JsonPrimitive) add(k.lowercase())
+                }
             }
         }
         for (pref in preferredKeys) if (pref.lowercase() in lowers) return pref
         return lowers.firstOrNull { it.contains("fuel") && (it.contains("consum") || it.contains("total")) }
     }
 
+    /**
+     * Retrieve numeric value at dotted path; if strict lookup fails, deep-scan once.
+     */
     private fun getValueByDotted(row: JsonObject, dotted: String): Double? {
         fun getStrict(obj: JsonElement?, parts: List<String>, i: Int): JsonElement? {
             if (obj == null) return null
@@ -163,9 +188,20 @@ class IntanglesRepository {
         }
         val parts = dotted.split(".")
         val strict = getStrict(row, parts, 0)
-        val leaf = strict ?: walkKeys(row).firstOrNull { it.first.equals(dotted, true) }?.second
-        return (leaf as? JsonPrimitive)?.let { prim ->
-            if (prim.isString) prim.content.trim().replace(",", "").toDoubleOrNull() else try { prim.double } catch (_: Exception) { null }
+        val leaf = strict ?: walkKeys(row).firstOrNull { it.first.equals(dotted, ignoreCase = true) }?.second
+        return (leaf as? JsonPrimitive)?.toDoubleOrNullRelaxed()
+    }
+
+    /**
+     * Parse JsonPrimitive to Double:
+     *  - numeric primitives
+     *  - strings like "1,234.56"
+     */
+    private fun JsonPrimitive.toDoubleOrNullRelaxed(): Double? {
+        return if (isString) {
+            this.content.trim().replace(",", "").toDoubleOrNull()
+        } else {
+            try { this.double } catch (_: Exception) { null }
         }
     }
 }
