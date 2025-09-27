@@ -1,3 +1,9 @@
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.serialization")
+}
+
 android {
     namespace = "com.example.tco2display"
     compileSdk = 34
@@ -9,15 +15,17 @@ android {
         versionCode = 1
         versionName = "1.0"
 
+        // Token injected by CI into ~/.gradle/gradle.properties
         val t = (project.findProperty("INTANGLES_TOKEN") as String?) ?: ""
         buildConfigField("String", "INTANGLES_TOKEN", "\"$t\"")
     }
 
-    // ✅ Make Java compile target match Kotlin (both 17)
+    // Keep Java & Kotlin on 17 (fixes JVM target mismatch)
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    kotlinOptions { jvmTarget = "17" }
 
     buildTypes {
         release {
@@ -35,9 +43,6 @@ android {
         buildConfig = true
     }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
-
-    // You already had this; keep it
-    kotlinOptions { jvmTarget = "17" }
 }
 
 dependencies {
@@ -60,6 +65,6 @@ dependencies {
     implementation("com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter:1.0.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
+    // Needed because your manifest references a Material theme
     implementation("com.google.android.material:material:1.12.0")
-
 }
