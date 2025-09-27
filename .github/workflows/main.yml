@@ -19,23 +19,19 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      # Set up Android SDK & accept licenses
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      # Install the SDK components needed by your build
       - name: Install Android SDK packages
         run: |
           sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-      # Provision Gradle 8.7 WITHOUT caching (avoid cache outage failures)
       - name: Set up Gradle 8.7 (no cache)
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: 8.7
           cache-disabled: true
 
-      # Write your secret token into user gradle.properties for the build
       - name: Inject Gradle properties (token)
         run: |
           mkdir -p ~/.gradle
@@ -44,11 +40,9 @@ jobs:
             echo "INTANGLES_TOKEN=${{ secrets.INTANGLES_TOKEN }}"
           } >> ~/.gradle/gradle.properties
 
-      # Build the APK
       - name: Build Debug APK
-        run: gradle assembleDebug
+        run: gradle :app:assembleDebug
 
-      # Upload the artifact
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
