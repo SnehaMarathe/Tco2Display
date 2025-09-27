@@ -22,7 +22,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.tco2display.ui.Tco2ViewModel
 import java.util.Locale
 
-// For immersive fullscreen
+// immersive fullscreen helpers
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -31,7 +31,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // --- Fullscreen (hide system bars) ---
+        // Fullscreen (hide system bars)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val controller = WindowInsetsControllerCompat(window, window.decorView)
         controller.systemBarsBehavior =
@@ -41,6 +41,18 @@ class MainActivity : ComponentActivity() {
         setContent {
             val vm: Tco2ViewModel = viewModel()
             val tco2 by vm.tco2.collectAsState()
+
+            // Colors tuned to the screenshot vibe
+            val blueNumber = Color(0xFFAEBBFF)   // soft periwinkle
+            val mintDecimal = Color(0xFFCFEFDB)  // pale mint
+            val greenAccent = Color(0xFF6AC73A)  // bold green
+
+            // Sizes tuned for landscape fullscreen
+            val sizeNumber = 120.sp    // base size for number
+            val sizeLastDigit = 140.sp // bigger final digit
+            val sizeUnit = 44.sp       // small inline "kg"
+            val sizeHeading = 36.sp
+            val sizeBottom =  fortySp() // helper below to avoid magic numbers
 
             Box(
                 modifier = Modifier
@@ -58,53 +70,69 @@ class MainActivity : ComponentActivity() {
                     Text(
                         text = "CO2 Savings",
                         color = Color.White,
-                        fontSize = 28.sp,
+                        fontSize = sizeHeading,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    // Value line: BIG number, smaller unit, last decimal digit green
+                    // Main readout (styled like the screenshot)
                     val readout = if (tco2 == null) {
                         buildAnnotatedString {
-                            withStyle(SpanStyle(color = Color.White, fontSize = 40.sp, fontWeight = FontWeight.SemiBold)) {
+                            withStyle(SpanStyle(color = blueNumber, fontSize = sizeNumber, fontWeight = FontWeight.SemiBold)) {
                                 append("—")
                             }
-                            withStyle(SpanStyle(color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)) {
-                                append(" tCO2")
+                            withStyle(SpanStyle(color = greenAccent, fontSize = sizeUnit, fontWeight = FontWeight.SemiBold)) {
+                                append(" kg")
                             }
                         }
                     } else {
-                        val valueOnly = String.format(Locale.US, "%.3f", tco2)
-                        val unit = " tCO2"
-                        val green = Color(0xFF22C55E)
+                        val value = String.format(Locale.US, "%.3f", tco2)
+                        val dot = value.indexOf('.')
+                        val intPart = if (dot >= 0) value.substring(0, dot) else value
+                        val fracPart = if (dot >= 0) value.substring(dot + 1) else "" // should be 3 chars
+
+                        val firstTwo = if (fracPart.length >= 2) fracPart.substring(0, 2) else fracPart
+                        val lastDigit = if (fracPart.isNotEmpty()) fracPart.last().toString() else ""
 
                         buildAnnotatedString {
-                            // record where the number starts
-                            val start = length
-                            // BIG number
-                            withStyle(SpanStyle(color = Color.White, fontSize = 100.sp, fontWeight = FontWeight.SemiBold)) {
-                                append(valueOnly)
+                            // integer part
+                            withStyle(SpanStyle(color = blueNumber, fontSize = sizeNumber, fontWeight = FontWeight.SemiBold)) {
+                                append(intPart)
                             }
-                            // make the last decimal digit green
-                            val lastDigitIndex = start + valueOnly.length - 1
-                            if (valueOnly.contains('.') && valueOnly.isNotEmpty()) {
-                                addStyle(
-                                    SpanStyle(color = green),
-                                    start = lastDigitIndex,
-                                    end = lastDigitIndex + 1
-                                )
+                            // dot + first two decimals (mint)
+                            if (dot >= 0) {
+                                withStyle(SpanStyle(color = mintDecimal, fontSize = sizeNumber, fontWeight = FontWeight.SemiBold)) {
+                                    append(".")
+                                    append(firstTwo)
+                                }
                             }
-                            // smaller unit
-                            withStyle(SpanStyle(color = Color.White, fontSize = 40.sp, fontWeight = FontWeight.SemiBold)) {
-                                append(unit)
+                            // last decimal digit (bigger + green)
+                            if (lastDigit.isNotEmpty()) {
+                                withStyle(SpanStyle(color = greenAccent, fontSize = sizeLastDigit, fontWeight = FontWeight.SemiBold)) {
+                                    append(lastDigit)
+                                }
+                            }
+                            // small inline unit "kg" in green
+                            withStyle(SpanStyle(color = greenAccent, fontSize = sizeUnit, fontWeight = FontWeight.SemiBold)) {
+                                append(" kg")
                             }
                         }
                     }
 
                     Text(
                         text = readout,
-                        color = Color.White, // default for any text without spans
+                        color = Color.White, // default for spans without explicit color
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    // Bottom label "tCO2" centered (small, bluish)
+                    Text(
+                        text = "tCO2",
+                        color = blueNumber,
+                        fontSize = 44.sp,
+                        fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -113,3 +141,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+// tiny helper so we can keep sizes grouped at the top if you want to tweak
+private fun fortySp() = 44.sp
