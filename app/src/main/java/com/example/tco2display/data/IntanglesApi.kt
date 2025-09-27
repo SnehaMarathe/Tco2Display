@@ -1,7 +1,6 @@
 package com.example.tco2display.data
 
 import kotlinx.serialization.json.JsonElement
-import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.HeaderMap
 import retrofit2.http.Query
@@ -19,5 +18,5 @@ interface IntanglesApi {
         @Query("lastloc") lastloc: Boolean,
         @Query("acc_id") accId: String,
         @Query("lang") lang: String
-    ): Response<JsonElement>   // <-- IMPORTANT: Response<>
+    ): JsonElement
 }
