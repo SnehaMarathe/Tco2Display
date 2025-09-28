@@ -268,8 +268,8 @@ private fun TruckImageAnimation(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Blue Energy Motors",
-                    color = Color.Blue,
+                    text = "",
+                    color = Color.White,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
