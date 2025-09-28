@@ -262,7 +262,7 @@ private fun TruckImageAnimation(
 
             Box(
                 modifier = Modifier
-                    .offset(x = trailerRight, y = trailerTop)
+                    .offset(x = trailerLeft, y = trailerTop)
                     .width(trailerWidth)
                     .height(trailerHeight),
                 contentAlignment = Alignment.Center
