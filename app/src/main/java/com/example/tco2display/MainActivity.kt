@@ -69,7 +69,7 @@ class MainActivity : ComponentActivity() {
                     .background(Color.Black)
                     .padding(horizontal = 24.dp)
             ) {
-                // Center big number that auto-fits in one line
+                // Center: auto-fit number on one line
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -81,19 +81,19 @@ class MainActivity : ComponentActivity() {
                         midDecimalColor = mintDecimal,
                         lastDigitColor = greenAccent,
                         baseMinSp = 48f,
-                        baseMaxSp = 320f,
-                        lastDigitScale = 1.24f, // last digit is 24% larger
+                        baseMaxSp = 340f,
+                        lastDigitScale = 1.24f // last digit ~24% larger
                     )
                 }
 
-                // Truck animation strip pinned to bottom, fully off-screen on both ends
+                // Bottom: truck animation (30% smaller -> ~60dp high)
                 TruckImageAnimation(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .padding(bottom = 6.dp),
                     resId = R.drawable.truck_inverted,
-                    height = 84.dp,
+                    height = 60.dp,         // ~30% smaller than 84.dp
                     durationMs = 7000
                 )
             }
@@ -102,13 +102,11 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * Renders the number with styles and automatically scales the font size so
- * the whole thing fits on ONE line and fills the available width.
- *
- * - Integer part = intColor, base size
- * - '.' + first two decimals = midDecimalColor, base size
- * - last decimal digit = lastDigitColor, base size * lastDigitScale
- * - No unit text (per request)
+ * Auto-scales the styled number to fill width in ONE line (no wrap).
+ * - Integer part: intColor, base size
+ * - '.' + first two decimals: midDecimalColor, base size
+ * - Last decimal: lastDigitColor, base size * lastDigitScale
+ * - No unit text
  */
 @Composable
 private fun FitNumberTextOneLine(
@@ -126,9 +124,8 @@ private fun FitNumberTextOneLine(
         val maxWidthPx = with(density) { maxWidth.toPx() }.roundToInt()
         val constraints = Constraints(maxWidth = maxWidthPx)
 
-        // build a function that creates the styled text for a given base size (sp)
-        fun buildStyled(baseSp: Float): androidx.compose.ui.text.AnnotatedString {
-            return if (value == null) {
+        fun styledText(baseSp: Float) =
+            if (value == null) {
                 buildAnnotatedString {
                     withStyle(
                         SpanStyle(
@@ -147,7 +144,6 @@ private fun FitNumberTextOneLine(
                 val lastDigit = if (fracPart.isNotEmpty()) fracPart.last().toString() else ""
 
                 buildAnnotatedString {
-                    // integer part
                     withStyle(
                         SpanStyle(
                             color = intColor,
@@ -156,7 +152,6 @@ private fun FitNumberTextOneLine(
                         )
                     ) { append(intPart) }
 
-                    // dot + first two decimals
                     if (dot >= 0) {
                         withStyle(
                             SpanStyle(
@@ -170,7 +165,6 @@ private fun FitNumberTextOneLine(
                         }
                     }
 
-                    // last decimal digit (bigger)
                     if (lastDigit.isNotEmpty()) {
                         withStyle(
                             SpanStyle(
@@ -182,15 +176,14 @@ private fun FitNumberTextOneLine(
                     }
                 }
             }
-        }
 
-        // Binary search for the largest base font size that fits in one line
+        // Binary search the largest base size that fits width
         var low = baseMinSp
         var high = baseMaxSp
         var best = low
-        repeat(12) { // 2^12 ≈ 4096 size resolution
+        repeat(12) {
             val mid = (low + high) / 2f
-            val text = buildStyled(mid)
+            val text = styledText(mid)
             val result = measurer.measure(
                 text = text,
                 style = TextStyle.Default,
@@ -200,16 +193,14 @@ private fun FitNumberTextOneLine(
                 constraints = constraints
             )
             if (!result.didOverflowWidth) {
-                best = mid
-                low = mid // fits → try larger
+                best = mid; low = mid
             } else {
-                high = mid // too big → go smaller
+                high = mid
             }
         }
 
-        val finalText = buildStyled(best)
         Text(
-            text = finalText,
+            text = styledText(best),
             color = Color.White,
             textAlign = TextAlign.Center,
             maxLines = 1,
@@ -222,8 +213,8 @@ private fun FitNumberTextOneLine(
 
 /**
  * Bottom truck animation using the inverted PNG.
- * The truck starts completely off-screen left and exits completely off-screen right.
- * Also overlays "Blue Energy Motors" on the trailer.
+ * Truck starts fully off-screen left and exits fully off-screen right.
+ * Overlays "Blue Energy Motors" centered on the trailer.
  */
 @Composable
 private fun TruckImageAnimation(
@@ -241,13 +232,11 @@ private fun TruckImageAnimation(
     )
 
     BoxWithConstraints(modifier = modifier.height(height)) {
-        val imgWidth = height * 3.6f         // assume ~3.6:1 aspect for the truck image
-        val track = maxWidth + imgWidth      // distance from fully-off-left to fully-off-right
-
-        // x = -imgWidth .. +maxWidth  (so truck is fully off-screen at both ends)
+        val imgWidth = height * 3.6f           // ~3.6:1 aspect for the PNG
+        val track = maxWidth + imgWidth        // off-left to off-right distance
         val xOffset = (-imgWidth) + (track * progress)
 
-        // moving container sized to the image
+        // Moving container sized to the image
         Box(
             modifier = Modifier
                 .offset(x = xOffset)
@@ -260,20 +249,28 @@ private fun TruckImageAnimation(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Trailer text overlay (roughly the right 70% of the image)
-            val trailerStart = imgWidth * 0.22f
-            val trailerWidth = imgWidth * 0.70f
+            // Trailer text overlay — tuned to sit inside the trailer region
+            val trailerLeftRatio   = 0.285f
+            val trailerTopRatio    = 0.26f
+            val trailerWidthRatio  = 0.63f
+            val trailerHeightRatio = 0.42f
+
+            val trailerLeft   = imgWidth * trailerLeftRatio
+            val trailerTop    = height   * trailerTopRatio
+            val trailerWidth  = imgWidth * trailerWidthRatio
+            val trailerHeight = height   * trailerHeightRatio
+
             Box(
                 modifier = Modifier
-                    .offset(x = trailerStart, y = height * 0.18f)
+                    .offset(x = trailerLeft, y = trailerTop)
                     .width(trailerWidth)
-                    .height(height * 0.54f),
+                    .height(trailerHeight),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "Blue Energy Motors",
-                    color = Color.Blue,
-                    fontSize = 14.sp,
+                    color = Color.White,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
