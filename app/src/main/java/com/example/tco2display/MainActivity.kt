@@ -45,6 +45,8 @@ import androidx.compose.animation.core.animateFloat
 import android.graphics.Paint
 import android.graphics.Typeface
 
+import androidx.compose.ui.graphics.nativeCanvas
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
