@@ -17,6 +17,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -45,8 +46,6 @@ import androidx.compose.animation.core.animateFloat
 import android.graphics.Paint
 import android.graphics.Typeface
 
-import androidx.compose.ui.graphics.nativeCanvas
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,76 +66,114 @@ class MainActivity : ComponentActivity() {
             val mintDecimal = Color(0xFFCFEFDB)  // first two decimals
             val greenAccent = Color(0xFF6AC73A)  // last decimal + inline unit
 
-            // Sizes
-            val sizeNumber = 120.sp
-            val sizeLastDigit = 140.sp
-            val sizeUnit = 44.sp
+            // Sizes — bigger number, smaller unit
+            val sizeNumber = 160.sp
+            val sizeLastDigit = 196.sp
+            val sizeUnit = 32.sp
 
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black)
-                    .padding(horizontal = 24.dp),
-                contentAlignment = Alignment.Center
+                    .padding(horizontal = 24.dp)
             ) {
-                // Truck & trailer animation behind the text
+                // Centered main readout
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                ) {
+                    val readout = if (tco2 == null) {
+                        buildAnnotatedString {
+                            withStyle(
+                                SpanStyle(
+                                    color = blueNumber,
+                                    fontSize = sizeNumber,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            ) { append("—") }
+                            withStyle(
+                                SpanStyle(
+                                    color = greenAccent,
+                                    fontSize = sizeUnit,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            ) { append(" tCO2") }
+                        }
+                    } else {
+                        val value = String.format(Locale.US, "%.3f", tco2)
+                        val dot = value.indexOf('.')
+                        val intPart = if (dot >= 0) value.substring(0, dot) else value
+                        val fracPart = if (dot >= 0) value.substring(dot + 1) else "" // 3 chars
+                        val firstTwo = if (fracPart.length >= 2) fracPart.substring(0, 2) else fracPart
+                        val lastDigit = if (fracPart.isNotEmpty()) fracPart.last().toString() else ""
+
+                        buildAnnotatedString {
+                            // integer part
+                            withStyle(
+                                SpanStyle(
+                                    color = blueNumber,
+                                    fontSize = sizeNumber,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            ) { append(intPart) }
+
+                            // dot + first two decimals (mint)
+                            if (dot >= 0) {
+                                withStyle(
+                                    SpanStyle(
+                                        color = mintDecimal,
+                                        fontSize = sizeNumber,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                ) {
+                                    append(".")
+                                    append(firstTwo)
+                                }
+                            }
+
+                            // last decimal digit (bigger + green)
+                            if (lastDigit.isNotEmpty()) {
+                                withStyle(
+                                    SpanStyle(
+                                        color = greenAccent,
+                                        fontSize = sizeLastDigit,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                ) { append(lastDigit) }
+                            }
+
+                            // small inline unit → tCO2
+                            withStyle(
+                                SpanStyle(
+                                    color = greenAccent,
+                                    fontSize = sizeUnit,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            ) { append(" tCO2") }
+                        }
+                    }
+
+                    Text(
+                        text = readout,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                // Truck animation at the bottom (separate layer)
                 TruckTrailerAnimation(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = 16.dp),
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .padding(bottom = 8.dp),
                     bodyColor = greenAccent.copy(alpha = 0.80f),
                     wheelColor = Color(0xFF1E1E1E),
                     accent = Color(0xFF9AE58F)
-                )
-
-                // Main readout (no heading, no bottom label)
-                val readout = if (tco2 == null) {
-                    buildAnnotatedString {
-                        withStyle(SpanStyle(color = blueNumber, fontSize = sizeNumber, fontWeight = FontWeight.SemiBold)) {
-                            append("—")
-                        }
-                        withStyle(SpanStyle(color = greenAccent, fontSize = sizeUnit, fontWeight = FontWeight.SemiBold)) {
-                            append(" tCO2")
-                        }
-                    }
-                } else {
-                    val value = String.format(Locale.US, "%.3f", tco2)
-                    val dot = value.indexOf('.')
-                    val intPart = if (dot >= 0) value.substring(0, dot) else value
-                    val fracPart = if (dot >= 0) value.substring(dot + 1) else "" // 3 chars expected
-                    val firstTwo = if (fracPart.length >= 2) fracPart.substring(0, 2) else fracPart
-                    val lastDigit = if (fracPart.isNotEmpty()) fracPart.last().toString() else ""
-
-                    buildAnnotatedString {
-                        // integer part
-                        withStyle(SpanStyle(color = blueNumber, fontSize = sizeNumber, fontWeight = FontWeight.SemiBold)) {
-                            append(intPart)
-                        }
-                        // dot + first two decimals (mint)
-                        if (dot >= 0) {
-                            withStyle(SpanStyle(color = mintDecimal, fontSize = sizeNumber, fontWeight = FontWeight.SemiBold)) {
-                                append(".")
-                                append(firstTwo)
-                            }
-                        }
-                        // last decimal digit (bigger + green)
-                        if (lastDigit.isNotEmpty()) {
-                            withStyle(SpanStyle(color = greenAccent, fontSize = sizeLastDigit, fontWeight = FontWeight.SemiBold)) {
-                                append(lastDigit)
-                            }
-                        }
-                        // small inline unit → tCO2
-                        withStyle(SpanStyle(color = greenAccent, fontSize = sizeUnit, fontWeight = FontWeight.SemiBold)) {
-                            append(" tCO2")
-                        }
-                    }
-                }
-
-                Text(
-                    text = readout,
-                    color = Color.White,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
@@ -144,7 +181,8 @@ class MainActivity : ComponentActivity() {
 }
 
 // -----------------------------------------------------------------------------
-// Truck + trailer animation (vector drawing, looped). Trailer shows “Blue Energy Motors”.
+// Truck + trailer animation (vector drawing, looped at the bottom).
+// Trailer shows “Blue Energy Motors”.
 // -----------------------------------------------------------------------------
 @Composable
 private fun TruckTrailerAnimation(
@@ -165,8 +203,8 @@ private fun TruckTrailerAnimation(
 
     Canvas(modifier = modifier) {
         // layout (use Float literals)
-        val groundY = size.height * 0.85f
-        val truckH = (size.height * 0.14f).coerceAtMost(160f)
+        val groundY = size.height * 0.78f
+        val truckH = (size.height * 0.70f).coerceAtMost(160f)   // scale to the given height
         val truckW = truckH * 3.1f
         val trailerW = truckW * 0.70f
         val cabW = truckW * 0.25f
