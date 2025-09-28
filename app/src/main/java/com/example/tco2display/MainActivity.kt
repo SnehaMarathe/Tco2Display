@@ -262,15 +262,15 @@ private fun TruckImageAnimation(
 
             Box(
                 modifier = Modifier
-                    .offset(x = trailerLeft, y = trailerTop)
+                    .offset(x = trailerRight, y = trailerTop)
                     .width(trailerWidth)
                     .height(trailerHeight),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "Blue Energy Motors",
-                    color = Color.White,
-                    fontSize = 18.sp,
+                    color = Color.Blue,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
