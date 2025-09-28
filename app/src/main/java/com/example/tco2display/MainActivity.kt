@@ -3,7 +3,7 @@ package com.example.tco2display
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
@@ -12,13 +12,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -35,16 +30,17 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 
-// animations for the truck
+// animation for the truck image
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloat
-
-// for drawing text on Canvas
-import android.graphics.Paint
-import android.graphics.Typeface
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import androidx.annotation.DrawableRes
+import androidx.compose.ui.text.style.TextOverflow
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,10 +62,10 @@ class MainActivity : ComponentActivity() {
             val mintDecimal = Color(0xFFCFEFDB)  // first two decimals
             val greenAccent = Color(0xFF6AC73A)  // last decimal + inline unit
 
-            // Sizes — bigger number, smaller unit
-            val sizeNumber = 160.sp
-            val sizeLastDigit = 196.sp
-            val sizeUnit = 32.sp
+            // Sizes — large number, smaller unit; last digit even larger
+            val sizeNumber = 170.sp
+            val sizeLastDigit = 210.sp
+            val sizeUnit = 28.sp
 
             Box(
                 modifier = Modifier
@@ -77,13 +73,13 @@ class MainActivity : ComponentActivity() {
                     .background(Color.Black)
                     .padding(horizontal = 24.dp)
             ) {
-                // Centered main readout
+                // Center big number
                 Column(
                     modifier = Modifier
                         .align(Alignment.Center)
                         .fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     val readout = if (tco2 == null) {
                         buildAnnotatedString {
@@ -145,7 +141,7 @@ class MainActivity : ComponentActivity() {
                                 ) { append(lastDigit) }
                             }
 
-                            // small inline unit → tCO2
+                            // inline unit → tCO2 (small)
                             withStyle(
                                 SpanStyle(
                                     color = greenAccent,
@@ -164,125 +160,76 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                // Truck animation at the bottom (separate layer)
-                TruckTrailerAnimation(
+                // Truck animation strip pinned to bottom
+                TruckImageAnimation(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .height(160.dp)
-                        .padding(bottom = 8.dp),
-                    bodyColor = greenAccent.copy(alpha = 0.80f),
-                    wheelColor = Color(0xFF1E1E1E),
-                    accent = Color(0xFF9AE58F)
+                        .padding(bottom = 6.dp),
+                    resId = R.drawable.truck_inverted,
+                    height = 84.dp,     // adjust strip height here
+                    durationMs = 7000
                 )
             }
         }
     }
 }
 
-// -----------------------------------------------------------------------------
-// Truck + trailer animation (vector drawing, looped at the bottom).
-// Trailer shows “Blue Energy Motors”.
-// -----------------------------------------------------------------------------
+/** Bottom truck animation using the inverted PNG. Also overlays "Blue Energy Motors" on the trailer. */
 @Composable
-private fun TruckTrailerAnimation(
+private fun TruckImageAnimation(
     modifier: Modifier = Modifier,
-    bodyColor: Color = Color(0xFF6AC73A),
-    wheelColor: Color = Color(0xFF1E1E1E),
-    accent: Color = Color(0xFFA8FFB3)
+    @DrawableRes resId: Int,
+    height: Dp,
+    durationMs: Int = 7000
 ) {
     val infinite = rememberInfiniteTransition(label = "truckLoop")
     val progress by infinite.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 7000, easing = LinearEasing)
-        ),
+        animationSpec = infiniteRepeatable(animation = tween(durationMs, easing = LinearEasing)),
         label = "truckProgress"
     )
 
-    Canvas(modifier = modifier) {
-        // layout (use Float literals)
-        val groundY = size.height * 0.78f
-        val truckH = (size.height * 0.70f).coerceAtMost(160f)   // scale to the given height
-        val truckW = truckH * 3.1f
-        val trailerW = truckW * 0.70f
-        val cabW = truckW * 0.25f
-        val boxH = truckH * 0.62f
-        val corner = CornerRadius(truckH * 0.08f, truckH * 0.08f)
+    BoxWithConstraints(modifier = modifier.height(height)) {
+        val imgWidth = height * 3.6f               // assume ~3.6:1 aspect for the truck image
+        val travel = maxWidth - imgWidth
+        val xOffset = travel * progress
 
-        // move from left (off-screen) to right (off-screen)
-        val x = (size.width + truckW) * progress - truckW
+        // moving container sized to the image
+        Box(
+            modifier = Modifier
+                .offset(x = xOffset)
+                .width(imgWidth)
+                .height(height)
+        ) {
+            Image(
+                painter = painterResource(resId),
+                contentDescription = "Truck",
+                modifier = Modifier.fillMaxSize()
+            )
 
-        // subtle road line
-        drawRect(
-            color = Color(0x22FFFFFF),
-            topLeft = Offset(0f, groundY + truckH * 0.25f),
-            size = Size(size.width, 2f)
-        )
-
-        // trailer box
-        val trailerTop = groundY - boxH
-        drawRoundRect(
-            color = bodyColor.copy(alpha = 0.35f),
-            topLeft = Offset(x, trailerTop),
-            size = Size(trailerW, boxH),
-            cornerRadius = corner
-        )
-
-        // --- trailer label: "Blue Energy Motors" ---
-        val label = "Blue Energy Motors"
-        drawIntoCanvas { canvas ->
-            val paint = Paint().apply {
-                isAntiAlias = true
-                color = Color.White.toArgb()
-                textAlign = Paint.Align.LEFT
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            // Trailer text overlay (roughly the right 70% of the image)
+            val trailerStart = imgWidth * 0.22f
+            val trailerWidth = imgWidth * 0.70f
+            Box(
+                modifier = Modifier
+                    .offset(x = trailerStart, y = height * 0.18f)
+                    .width(trailerWidth)
+                    .height(height * 0.54f),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Blue Energy Motors",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
-            // start with a text size that fits height, then shrink if too wide
-            paint.textSize = (boxH * 0.36f)
-            var textWidth = paint.measureText(label)
-            val maxWidth = trailerW * 0.90f
-            if (textWidth > maxWidth) {
-                val scale = maxWidth / textWidth
-                paint.textSize = paint.textSize * scale
-                textWidth = paint.measureText(label)
-            }
-            val fm = paint.fontMetrics
-            val textHeight = fm.descent - fm.ascent
-            val textX = x + (trailerW - textWidth) / 2f
-            val textY = trailerTop + (boxH - textHeight) / 2f - fm.ascent
-            canvas.nativeCanvas.drawText(label, textX, textY, paint)
-        }
-
-        // cab
-        drawRoundRect(
-            color = bodyColor,
-            topLeft = Offset(x + trailerW + truckH * 0.10f, trailerTop),
-            size = Size(cabW, boxH),
-            cornerRadius = corner
-        )
-
-        // cab window accent
-        drawRoundRect(
-            color = accent.copy(alpha = 0.9f),
-            topLeft = Offset(x + trailerW + truckH * 0.16f, trailerTop + truckH * 0.12f),
-            size = Size(cabW * 0.45f, boxH * 0.38f),
-            cornerRadius = CornerRadius(truckH * 0.05f, truckH * 0.05f)
-        )
-
-        // wheels
-        val r = truckH * 0.18f
-        val yWheel = groundY + r * 0.35f
-        val w1x = x + trailerW * 0.25f
-        val w2x = x + trailerW * 0.70f
-        val w3x = x + trailerW + truckH * 0.20f
-        val wheelXs: List<Float> = listOf(w1x, w2x, w3x)
-
-        for (wx: Float in wheelXs) {
-            drawCircle(color = wheelColor, radius = r, center = Offset(wx, yWheel))
-            drawCircle(color = Color.White.copy(alpha = 0.12f), radius = r * 0.45f, center = Offset(wx, yWheel))
-            drawCircle(color = accent.copy(alpha = 0.7f), radius = r * 0.12f, center = Offset(wx, yWheel))
         }
     }
 }
