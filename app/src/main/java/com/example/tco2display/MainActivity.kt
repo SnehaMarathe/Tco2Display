@@ -272,8 +272,8 @@ private fun TruckImageAnimation(
             ) {
                 Text(
                     text = "Blue Energy Motors",
-                    color = Color.White,
-                    fontSize = 18.sp,
+                    color = Color.Blue,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
