@@ -7,10 +7,15 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -35,11 +40,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.animation.core.animateFloat   // ✅ needed for InfiniteTransition.animateFloat
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -82,7 +83,7 @@ class MainActivity : ComponentActivity() {
                     .padding(horizontal = 24.dp),
                 contentAlignment = Alignment.Center
             ) {
-                // --- lively truck animation at the bottom (drawn first so it's behind content) ---
+                // --- lively truck animation at the bottom ---
                 TruckTrailerAnimation(
                     modifier = Modifier
                         .fillMaxSize()
@@ -107,7 +108,7 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    // Main readout (styled like your screenshot, but animated)
+                    // Main readout (styled + animated)
                     val readout = if (tco2 == null) {
                         buildAnnotatedString {
                             withStyle(
@@ -181,7 +182,7 @@ class MainActivity : ComponentActivity() {
 
                     Text(
                         text = readout,
-                        color = Color.White, // default for spans without explicit color
+                        color = Color.White,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -214,7 +215,6 @@ private fun TruckTrailerAnimation(
     wheelColor: Color = Color(0xFF1E1E1E),
     accent: Color = Color(0xFFA8FFB3)
 ) {
-    // 6–8s loop across the screen
     val infinite = rememberInfiniteTransition(label = "truckLoop")
     val progress by infinite.animateFloat(
         initialValue = 0f,
@@ -226,9 +226,9 @@ private fun TruckTrailerAnimation(
     )
 
     Canvas(modifier = modifier) {
-        // layout
+        // layout (all Float literals have 'f' to avoid Double/Float ambiguity)
         val groundY = size.height * 0.85f
-        val truckH = (size.height * 0.14f).coerceAtMost(160f)           // cap height for tablets
+        val truckH = (size.height * 0.14f).coerceAtMost(160f)
         val truckW = truckH * 3.1f
         val trailerW = truckW * 0.70f
         val cabW = truckW * 0.25f
@@ -256,7 +256,7 @@ private fun TruckTrailerAnimation(
         // cab
         drawRoundRect(
             color = bodyColor,
-            topLeft = Offset(x + trailerW + truckH * 0.1f, groundY - boxH),
+            topLeft = Offset(x + trailerW + truckH * 0.10f, groundY - boxH),
             size = Size(cabW, boxH),
             cornerRadius = corner
         )
@@ -269,14 +269,15 @@ private fun TruckTrailerAnimation(
             cornerRadius = CornerRadius(truckH * 0.05f, truckH * 0.05f)
         )
 
-        // wheels
+        // wheels (explicit list type to avoid inference ambiguity)
         val r = truckH * 0.18f
         val yWheel = groundY + r * 0.35f
         val w1x = x + trailerW * 0.25f
         val w2x = x + trailerW * 0.70f
         val w3x = x + trailerW + truckH * 0.20f
 
-        listOf(w1x, w2x, w3x).forEach { wx ->
+        val wheelXs: List<Float> = listOf(w1x, w2x, w3x)
+        for (wx: Float in wheelXs) {
             drawCircle(color = wheelColor, radius = r, center = Offset(wx, yWheel))
             drawCircle(color = Color.White.copy(alpha = 0.12f), radius = r * 0.45f, center = Offset(wx, yWheel))
             drawCircle(color = accent.copy(alpha = 0.7f), radius = r * 0.12f, center = Offset(wx, yWheel))
