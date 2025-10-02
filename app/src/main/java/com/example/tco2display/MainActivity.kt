@@ -54,11 +54,11 @@ class MainActivity : ComponentActivity() {
             val tco2 by vm.tco2.collectAsState()
 
             val bg = Color(0xFF000000)
-            val white = Color(0xFFD0D0D0)        // lit segments
-            val ghost = Color.White.copy(alpha = 0.18f) // very light “off” segments
-            val green = Color(0xFF39D353)        // last decimal
+            val white = Color(0xFFD0D0D0)               // lit segments
+            val ghost = Color.White.copy(alpha = 0.18f)  // very light “off” segments
+            val green = Color(0xFF39D353)               // last decimal
 
-            // seven-segment font (you kept the same name)
+            // seven-segment font you’re using
             val segFont = FontFamily(Font(R.font.technology_bold, weight = FontWeight.Bold))
 
             Box(
@@ -70,7 +70,7 @@ class MainActivity : ComponentActivity() {
                 // ── BLUE ENERGY MOTORS ──
                 TopBar(title = "BLUE ENERGY MOTORS", color = white, lineThickness = 3.dp)
 
-                // Big number: constant size + ghost layer + last digit green
+                // Big number: constant size (no cap), ghost layer, last digit green
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -82,9 +82,9 @@ class MainActivity : ComponentActivity() {
                         textColor = white,
                         ghostColor = ghost,
                         lastDigitColor = green,
-                        maxIntegerDigits = 7,   // increase if your totals can exceed 7 digits
-                        baseMinSp = 48f,
-                        baseMaxSp = 420f,
+                        maxIntegerDigits = 7,       // bump if you need more integer places
+                        baseMinSp = 24f,
+                        baseMaxSp = 1500f,          // << effectively NO cap — width decides
                         lastDigitScale = 1.22f,
                         letterSpacingSp = 0f
                     )
@@ -141,13 +141,8 @@ private fun TopBar(title: String, color: Color, lineThickness: Dp) {
     }
 }
 
-/*────────────────  Number with constant size + ghost layer  ───────────────*/
+/*──────────────  Number with constant size + ghost layer (no cap)  ─────────────*/
 
-/**
- * Sizes once using a widest template (all 8’s), then reuses that size so
- * spacing never changes. Draws a faint “ghost” row underneath like a
- * seven-segment display background. Removes leading zeros (keeps one 0).
- */
 @Composable
 private fun FixedSizeSegFontWithGhost(
     value: Double?,
@@ -168,18 +163,18 @@ private fun FixedSizeSegFontWithGhost(
         val maxWidthPx = with(LocalDensity.current) { maxWidth.toPx() }.roundToInt()
         val constraints = Constraints(maxWidth = maxWidthPx)
 
-        // template for sizing (all 8’s are widest)
+        // Template for sizing (all 8’s are widest)
         fun template(baseSp: Float) = buildAnnotatedString {
             withStyle(SpanStyle(fontSize = baseSp.sp)) { append("8".repeat(maxIntegerDigits)) }
             withStyle(SpanStyle(fontSize = baseSp.sp)) { append("."); append("88") }
             withStyle(SpanStyle(fontSize = (baseSp * lastDigitScale).sp)) { append("8") }
         }
 
-        // Binary search largest size that fits one line
+        // Binary-search: largest size that fits ONE line by width (no height/percent cap)
         var low = baseMinSp
         var high = baseMaxSp
         var best = low
-        repeat(12) {
+        repeat(14) {
             val mid = (low + high) / 2f
             val res = measurer.measure(
                 text = template(mid),
@@ -188,8 +183,7 @@ private fun FixedSizeSegFontWithGhost(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = letterSpacingSp.sp,
                     platformStyle = PlatformTextStyle(includeFontPadding = false),
-                    // if the font exposes OpenType tabular numbers, this locks equal widths
-                    fontFeatureSettings = "tnum"
+                    fontFeatureSettings = "tnum" // tabular numerals if supported
                 ),
                 maxLines = 1,
                 softWrap = false,
@@ -199,10 +193,9 @@ private fun FixedSizeSegFontWithGhost(
             if (!res.didOverflowWidth) { best = mid; low = mid } else { high = mid }
         }
 
-        // Build actual number (trim leading zeros)
+        // Build actual number (trim leading zeros but keep one)
         val display = if (value == null) "0.${"0".repeat(fractionDigits)}"
-        else String.format(Locale.US, "%.${fractionDigits}f", value)
-
+                      else String.format(Locale.US, "%.${fractionDigits}f", value)
         val dot = display.indexOf('.')
         val rawInt = if (dot >= 0) display.substring(0, dot) else display
         val trimmedInt = rawInt.replaceFirst(Regex("^0+(?!$)"), "").ifEmpty { "0" }
@@ -211,17 +204,14 @@ private fun FixedSizeSegFontWithGhost(
         val firstTwo = frac.take(2)
         val last = frac.last().toString()
 
-        // Ghost layer equals the template (so background grid stays fixed)
+        // Ghost layer (full template) then actual
         val ghostText = template(best)
-
-        // Foreground with real digits and green last digit
         val actualText = buildAnnotatedString {
             withStyle(SpanStyle(color = textColor, fontSize = best.sp)) { append(trimmedInt) }
             withStyle(SpanStyle(color = textColor, fontSize = best.sp)) { append("."); append(firstTwo) }
             withStyle(SpanStyle(color = lastDigitColor, fontSize = (best * lastDigitScale).sp)) { append(last) }
         }
 
-        // Draw ghost, then actual value—identical layout, so spacing stays constant
         Text(
             text = ghostText,
             color = ghostColor,
