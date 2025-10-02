@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -53,11 +54,12 @@ class MainActivity : ComponentActivity() {
             val tco2 by vm.tco2.collectAsState()
 
             val bg = Color(0xFF000000)
-            val white = Color(0xFFD0D0D0)  // subtle grey-white like your mock
-            val green = Color(0xFF39D353)
+            val white = Color(0xFFD0D0D0)        // lit segments
+            val ghost = Color.White.copy(alpha = 0.18f) // very light “off” segments
+            val green = Color(0xFF39D353)        // last decimal
 
-            // seven-segment font
-            val techFont = FontFamily(Font(R.font.technology_bold, weight = FontWeight.Bold))
+            // seven-segment font (you kept the same name)
+            val segFont = FontFamily(Font(R.font.technology_bold, weight = FontWeight.Bold))
 
             Box(
                 modifier = Modifier
@@ -68,19 +70,19 @@ class MainActivity : ComponentActivity() {
                 // ── BLUE ENERGY MOTORS ──
                 TopBar(title = "BLUE ENERGY MOTORS", color = white, lineThickness = 3.dp)
 
-                // Fixed-size, one-line number (no leading zeros; last digit green)
+                // Big number: constant size + ghost layer + last digit green
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
                         .fillMaxWidth()
                 ) {
-                    FixedSizeSevenSegNumber(
+                    FixedSizeSegFontWithGhost(
                         value = tco2,
-                        fontFamily = techFont,
-                        intAndFirstTwoColor = white,
+                        fontFamily = segFont,
+                        textColor = white,
+                        ghostColor = ghost,
                         lastDigitColor = green,
-                        // choose the *maximum* integer length you expect (for sizing once)
-                        maxIntegerDigits = 7,
+                        maxIntegerDigits = 7,   // increase if your totals can exceed 7 digits
                         baseMinSp = 48f,
                         baseMaxSp = 420f,
                         lastDigitScale = 1.22f,
@@ -92,7 +94,7 @@ class MainActivity : ComponentActivity() {
                 Text(
                     text = "CARBON SAVINGS tCO2",
                     color = white,
-                    fontFamily = techFont,
+                    fontFamily = segFont,
                     fontWeight = FontWeight.Bold,
                     fontSize = 22.sp,
                     textAlign = TextAlign.Center,
@@ -139,18 +141,19 @@ private fun TopBar(title: String, color: Color, lineThickness: Dp) {
     }
 }
 
+/*────────────────  Number with constant size + ghost layer  ───────────────*/
+
 /**
- * Fixed-size (constant) seven-seg number:
- * - Computes the font size **once per layout size** using a *reference template*
- *   (e.g., "8888888.88X", where X is scaled as last digit).
- * - Then reuses that size for all subsequent value updates → no spacing jumps.
- * - Removes **all leading zeros** (but keeps "0" if the integer part is zero).
+ * Sizes once using a widest template (all 8’s), then reuses that size so
+ * spacing never changes. Draws a faint “ghost” row underneath like a
+ * seven-segment display background. Removes leading zeros (keeps one 0).
  */
 @Composable
-private fun FixedSizeSevenSegNumber(
+private fun FixedSizeSegFontWithGhost(
     value: Double?,
     fontFamily: FontFamily,
-    intAndFirstTwoColor: Color,
+    textColor: Color,
+    ghostColor: Color,
     lastDigitColor: Color,
     maxIntegerDigits: Int,
     baseMinSp: Float,
@@ -162,105 +165,90 @@ private fun FixedSizeSevenSegNumber(
     val measurer = rememberTextMeasurer()
 
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val density = LocalDensity.current
-        val maxWidthPx = with(density) { maxWidth.toPx() }.roundToInt()
+        val maxWidthPx = with(LocalDensity.current) { maxWidth.toPx() }.roundToInt()
         val constraints = Constraints(maxWidth = maxWidthPx)
 
-        // Build worst-case template (for sizing once): all 8s (widest),
-        // dot, first two decimals as 8, and last decimal scaled (represented by 'X').
-        fun templateStyled(baseSp: Float) = buildAnnotatedString {
-            // integer part (max columns)
-            withStyle(SpanStyle(color = intAndFirstTwoColor, fontSize = baseSp.sp)) {
-                append("8".repeat(maxIntegerDigits))
-            }
-            // '.' + first two decimals as 8
-            withStyle(SpanStyle(color = intAndFirstTwoColor, fontSize = baseSp.sp)) {
-                append(".")
-                append("88")
-            }
-            // last decimal bigger
-            withStyle(
-                SpanStyle(
-                    color = lastDigitColor,
-                    fontSize = (baseSp * lastDigitScale).sp
-                )
-            ) { append("8") }
+        // template for sizing (all 8’s are widest)
+        fun template(baseSp: Float) = buildAnnotatedString {
+            withStyle(SpanStyle(fontSize = baseSp.sp)) { append("8".repeat(maxIntegerDigits)) }
+            withStyle(SpanStyle(fontSize = baseSp.sp)) { append("."); append("88") }
+            withStyle(SpanStyle(fontSize = (baseSp * lastDigitScale).sp)) { append("8") }
         }
 
-        // Binary-search the **base** size ONCE per layout (constraints key)
-        val baseSizeSp = rememberTextMeasurer().let {
-            var low = baseMinSp
-            var high = baseMaxSp
-            var best = low
-            repeat(12) {
-                val mid = (low + high) / 2f
-                val res = measurer.measure(
-                    text = templateStyled(mid),
-                    style = TextStyle(
-                        fontFamily = fontFamily,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = letterSpacingSp.sp
-                    ),
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Clip,
-                    constraints = constraints
-                )
-                if (!res.didOverflowWidth) {
-                    best = mid
-                    low = mid
-                } else {
-                    high = mid
-                }
-            }
-            best
+        // Binary search largest size that fits one line
+        var low = baseMinSp
+        var high = baseMaxSp
+        var best = low
+        repeat(12) {
+            val mid = (low + high) / 2f
+            val res = measurer.measure(
+                text = template(mid),
+                style = TextStyle(
+                    fontFamily = fontFamily,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = letterSpacingSp.sp,
+                    platformStyle = PlatformTextStyle(includeFontPadding = false),
+                    // if the font exposes OpenType tabular numbers, this locks equal widths
+                    fontFeatureSettings = "tnum"
+                ),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+                constraints = constraints
+            )
+            if (!res.didOverflowWidth) { best = mid; low = mid } else { high = mid }
         }
 
-        // Format actual value (remove leading zeros)
-        val display = run {
-            if (value == null) "0.000"
-            else String.format(Locale.US, "%.3f", value)
-        }
+        // Build actual number (trim leading zeros)
+        val display = if (value == null) "0.${"0".repeat(fractionDigits)}"
+        else String.format(Locale.US, "%.${fractionDigits}f", value)
+
         val dot = display.indexOf('.')
         val rawInt = if (dot >= 0) display.substring(0, dot) else display
-        val trimmedInt = rawInt.replaceFirst(Regex("^0+(?!$)"), "") // drop all leading zeros, keep one zero
-        val frac = if (dot >= 0) display.substring(dot + 1) else "000"
-        val firstTwo = frac.take(2).padEnd(2, '0')
-        val lastDigit = if (frac.isNotEmpty()) frac.last().toString() else "0"
+        val trimmedInt = rawInt.replaceFirst(Regex("^0+(?!$)"), "").ifEmpty { "0" }
+        val frac = if (dot >= 0) display.substring(dot + 1).padEnd(fractionDigits, '0')
+                   else "0".repeat(fractionDigits)
+        val firstTwo = frac.take(2)
+        val last = frac.last().toString()
 
-        // Build the visible text using the **fixed** base size
-        val styled = buildAnnotatedString {
-            withStyle(
-                SpanStyle(
-                    color = intAndFirstTwoColor,
-                    fontSize = baseSizeSp.sp
-                )
-            ) { append(trimmedInt) }
-            withStyle(
-                SpanStyle(
-                    color = intAndFirstTwoColor,
-                    fontSize = baseSizeSp.sp
-                )
-            ) { append("."); append(firstTwo) }
-            withStyle(
-                SpanStyle(
-                    color = lastDigitColor,
-                    fontSize = (baseSizeSp * lastDigitScale).sp
-                )
-            ) { append(lastDigit) }
+        // Ghost layer equals the template (so background grid stays fixed)
+        val ghostText = template(best)
+
+        // Foreground with real digits and green last digit
+        val actualText = buildAnnotatedString {
+            withStyle(SpanStyle(color = textColor, fontSize = best.sp)) { append(trimmedInt) }
+            withStyle(SpanStyle(color = textColor, fontSize = best.sp)) { append("."); append(firstTwo) }
+            withStyle(SpanStyle(color = lastDigitColor, fontSize = (best * lastDigitScale).sp)) { append(last) }
         }
 
+        // Draw ghost, then actual value—identical layout, so spacing stays constant
         Text(
-            text = styled,
-            color = Color.White,
-            textAlign = TextAlign.Center,
+            text = ghostText,
+            color = ghostColor,
             maxLines = 1,
             softWrap = false,
-            overflow = TextOverflow.Clip,
+            textAlign = TextAlign.Center,
             style = TextStyle(
                 fontFamily = fontFamily,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = letterSpacingSp.sp
+                letterSpacing = letterSpacingSp.sp,
+                platformStyle = PlatformTextStyle(includeFontPadding = false),
+                fontFeatureSettings = "tnum"
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+        Text(
+            text = actualText,
+            color = textColor,
+            maxLines = 1,
+            softWrap = false,
+            textAlign = TextAlign.Center,
+            style = TextStyle(
+                fontFamily = fontFamily,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = letterSpacingSp.sp,
+                platformStyle = PlatformTextStyle(includeFontPadding = false),
+                fontFeatureSettings = "tnum"
             ),
             modifier = Modifier.fillMaxWidth()
         )
