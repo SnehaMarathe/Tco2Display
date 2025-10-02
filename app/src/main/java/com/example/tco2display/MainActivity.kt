@@ -21,6 +21,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.tco2display.ui.Tco2ViewModel
 import java.util.Locale
 import kotlin.math.min
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.toDp
+import androidx.compose.ui.unit.toPx
 
 // Immersive fullscreen helpers
 import androidx.core.view.WindowCompat
