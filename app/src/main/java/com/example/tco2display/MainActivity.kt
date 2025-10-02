@@ -3,10 +3,13 @@ package com.example.tco2display
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -14,16 +17,16 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.*
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.tco2display.ui.Tco2ViewModel
 import java.util.Locale
 import kotlin.math.min
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.toDp
-import androidx.compose.ui.unit.toPx
 
 // Immersive fullscreen helpers
 import androidx.core.view.WindowCompat
@@ -47,11 +50,10 @@ class MainActivity : ComponentActivity() {
 
             val bg = Color(0xFF000000)
             val segOn = Color(0xFFFFFFFF)       // white segments
-            val segOff = Color(0x22FFFFFF)      // very dim off segments (optional)
+            val segOff = Color(0x22FFFFFF)      // dim "off" segments
             val lastDigitOn = Color(0xFF39D353) // green last decimal
             val accent = Color.White
 
-            // layout: top title, big 7-segment, bottom caption
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -68,7 +70,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     DividerLine(color = accent, thickness = 3.dp, modifier = Modifier.weight(1f))
                     Text(
-                        "BLUE ENERGY MOTORS",
+                        text = "BLUE ENERGY MOTORS",
                         color = accent,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.ExtraBold,
@@ -78,7 +80,7 @@ class MainActivity : ComponentActivity() {
                     DividerLine(color = accent, thickness = 3.dp, modifier = Modifier.weight(1f))
                 }
 
-                // Center: Seven-segment number
+                // Center seven-segment number
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -87,8 +89,8 @@ class MainActivity : ComponentActivity() {
                 ) {
                     SevenSegmentNumber(
                         value = tco2,
-                        integerDigits = 7,   // adjust if you want more/less integer columns
-                        fractionDigits = 3,  // 3 decimals like your mock
+                        integerDigits = 7,   // adjust if you need more/less integer places
+                        fractionDigits = 3,  // three decimals
                         segmentColor = segOn,
                         offSegmentColor = segOff,
                         lastDigitColor = lastDigitOn
@@ -140,72 +142,73 @@ private fun SevenSegmentNumber(
     lastDigitColor: Color,
     gapDp: Dp = 8.dp
 ) {
-    // Build the string 0000000.000 when null; otherwise formatted with zero-padding
-    val formatted = remember(value) {
-        if (value == null) {
-            "0".repeat(integerDigits) + "." + "0".repeat(fractionDigits)
-        } else {
-            val abs = kotlin.math.abs(value)
-            val int = abs.toLong()
-            val fracScaled = ((abs - int) * Math.pow(10.0, fractionDigits.toDouble()))
-                .toLong()
-                .coerceAtMost((Math.pow(10.0, fractionDigits.toDouble()) - 1).toLong())
+    // Build "0000000.000" when null; otherwise format with zero-padding
+    val formatted = if (value == null) {
+        "0".repeat(integerDigits) + "." + "0".repeat(fractionDigits)
+    } else {
+        val abs = kotlin.math.abs(value)
+        val int = abs.toLong()
+        val scale = Math.pow(10.0, fractionDigits.toDouble())
+        val fracScaled = ((abs - int) * scale).toLong()
+            .coerceAtMost((scale - 1).toLong())
 
-            val intStr = int.toString().padStart(integerDigits, '0').takeLast(integerDigits)
-            val fracStr = fracScaled.toString().padStart(fractionDigits, '0')
-            "$intStr.$fracStr"
-        }
+        val intStr = int.toString().padStart(integerDigits, '0').takeLast(integerDigits)
+        val fracStr = fracScaled.toString().padStart(fractionDigits, '0')
+        "$intStr.$fracStr"
     }
 
-    // Layout math: we want the digits to fill the available width on a single line.
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val countDigits = integerDigits + fractionDigits // not counting the dot block
+        val density = LocalDensity.current
+        val maxWpx = with(density) { maxWidth.toPx() }
+        val maxHpx = with(density) { maxHeight.toPx() }
+        val gapPx = with(density) { gapDp.toPx() }
+
+        val countDigits = integerDigits + fractionDigits
         val dotSlots = 1
         val totalSlots = countDigits + dotSlots
         val gaps = (totalSlots - 1)
-        val gapPx = with(LocalDensity.current) { gapDp.toPx() }
 
-        // 7-segment aspect ratio: width ≈ 0.56 of height looks good; tune if desired
+        // 7-segment aspect ratio; tweak if preferred
         val digitAspect = 0.56f
 
-        // Solve for digitHeight so that total width fits:
-        // totalWidth = digitWidth*countDigits + dotWidth + gaps*gapPx
-        // dotWidth ≈ digitWidth*0.28
-        val maxW = constraints.maxWidth.toFloat()
-        val digitWidth = (maxW - gapPx * gaps) / (countDigits + 0.28f) // 0.28 slot for dot
-        val digitHeightFromW = digitWidth / digitAspect
+        // Fit to width (dot takes ~0.28 of a digit width)
+        val digitWidthPx = (maxWpx - gapPx * gaps) / (countDigits + 0.28f)
+        val digitHeightFromW = digitWidthPx / digitAspect
 
-        // Limit by available height as well (use ~50–60% of screen height)
-        val maxH = constraints.maxHeight.toFloat() * 0.6f
-        val digitH = min(digitHeightFromW, maxH)
-        val digitW = digitH * digitAspect
-        val dotW = digitW * 0.28f
-        val dotH = digitH * 0.12f
+        // Also limit by height (use ~60% of available height)
+        val digitHPx = min(digitHeightFromW, maxHpx * 0.60f)
+        val digitWPx = digitHPx * digitAspect
+        val dotWPx = digitWPx * 0.28f
+        val dotHPx = digitHPx * 0.12f
+
+        val digitHDp = with(density) { digitHPx.dp }
+        val dotWDp = with(density) { dotWPx.dp }
+        val dotHDp = with(density) { dotHPx.dp }
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(with(LocalDensity.current) { digitH.toDp() }),
+                .height(digitHDp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // integer digits
+            // Integer digits
             for (i in 0 until integerDigits) {
                 SevenSegmentDigit(
                     ch = formatted[i],
                     onColor = segmentColor,
                     offColor = offSegmentColor,
-                    widthPx = digitW,
-                    heightPx = digitH
+                    widthPx = digitWPx,
+                    heightPx = digitHPx
                 )
                 if (i != integerDigits - 1) Spacer(Modifier.width(gapDp))
             }
 
-            // dot (square)
+            // Dot (square)
             Spacer(Modifier.width(gapDp))
-            SevenSegmentDot(widthPx = dotW, heightPx = dotH, color = segmentColor)
+            SevenSegmentDot(widthDp = dotWDp, heightDp = dotHDp, color = segmentColor)
             Spacer(Modifier.width(gapDp))
 
-            // fraction digits (last one green)
+            // Fraction digits (last one green)
             for (i in 0 until fractionDigits) {
                 val idx = integerDigits + 1 + i
                 val isLast = i == fractionDigits - 1
@@ -213,8 +216,8 @@ private fun SevenSegmentNumber(
                     ch = formatted[idx],
                     onColor = if (isLast) lastDigitColor else segmentColor,
                     offColor = if (isLast) lastDigitColor.copy(alpha = 0.15f) else offSegmentColor,
-                    widthPx = digitW,
-                    heightPx = digitH
+                    widthPx = digitWPx,
+                    heightPx = digitHPx
                 )
                 if (i != fractionDigits - 1) Spacer(Modifier.width(gapDp))
             }
@@ -223,12 +226,10 @@ private fun SevenSegmentNumber(
 }
 
 @Composable
-private fun SevenSegmentDot(widthPx: Float, heightPx: Float, color: Color) {
-    val w = with(LocalDensity.current) { widthPx.toDp() }
-    val h = with(LocalDensity.current) { heightPx.toDp() }
+private fun SevenSegmentDot(widthDp: Dp, heightDp: Dp, color: Color) {
     Box(
         modifier = Modifier
-            .size(w, h)
+            .size(widthDp, heightDp)
             .background(color, shape = androidx.compose.foundation.shape.RoundedCornerShape(2.dp))
     )
 }
@@ -241,99 +242,93 @@ private fun SevenSegmentDigit(
     widthPx: Float,
     heightPx: Float
 ) {
-    // Segment order: a (top), b (upper-right), c (lower-right), d (bottom),
-    // e (lower-left), f (upper-left), g (middle)
-    val segMap: Map<Char, BooleanArray> = remember {
-        mapOf(
-            '0' to booleanArrayOf(true,  true,  true,  true,  true,  true,  false),
-            '1' to booleanArrayOf(false, true,  true,  false, false, false, false),
-            '2' to booleanArrayOf(true,  true,  false, true,  true,  false, true ),
-            '3' to booleanArrayOf(true,  true,  true,  true,  false, false, true ),
-            '4' to booleanArrayOf(false, true,  true,  false, false, true,  true ),
-            '5' to booleanArrayOf(true,  false, true,  true,  false, true,  true ),
-            '6' to booleanArrayOf(true,  false, true,  true,  true,  true,  true ),
-            '7' to booleanArrayOf(true,  true,  true,  false, false, false, false),
-            '8' to booleanArrayOf(true,  true,  true,  true,  true,  true,  true ),
-            '9' to booleanArrayOf(true,  true,  true,  true,  false, true,  true )
-        )
-    }
+    // Segment order: a, b, c, d, e, f, g
+    val segMap: Map<Char, BooleanArray> = mapOf(
+        '0' to booleanArrayOf(true,  true,  true,  true,  true,  true,  false),
+        '1' to booleanArrayOf(false, true,  true,  false, false, false, false),
+        '2' to booleanArrayOf(true,  true,  false, true,  true,  false, true ),
+        '3' to booleanArrayOf(true,  true,  true,  true,  false, false, true ),
+        '4' to booleanArrayOf(false, true,  true,  false, false, true,  true ),
+        '5' to booleanArrayOf(true,  false, true,  true,  false, true,  true ),
+        '6' to booleanArrayOf(true,  false, true,  true,  true,  true,  true ),
+        '7' to booleanArrayOf(true,  true,  true,  false, false, false, false),
+        '8' to booleanArrayOf(true,  true,  true,  true,  true,  true,  true ),
+        '9' to booleanArrayOf(true,  true,  true,  true,  false, true,  true )
+    )
     val active = segMap[ch] ?: booleanArrayOf(false, false, false, false, false, false, false)
 
-    val w = with(LocalDensity.current) { widthPx.toDp() }
-    val h = with(LocalDensity.current) { heightPx.toDp() }
-    val thickness = heightPx * 0.15f // segment thickness relative to height
-    val t = with(LocalDensity.current) { thickness.toDp() }
-    val radius = with(LocalDensity.current) { (thickness * 0.35f).toDp() }
+    val density = LocalDensity.current
+    val wDp = with(density) { widthPx.dp }
+    val hDp = with(density) { heightPx.dp }
 
-    androidx.compose.foundation.Canvas(
-        modifier = Modifier.size(w, h)
-    ) {
+    // segment thickness and corner radius (in px)
+    val thicknessPx = heightPx * 0.15f
+    val radiusPx = thicknessPx * 0.35f
+
+    Canvas(modifier = Modifier.size(wDp, hDp)) {
+        val t = thicknessPx
+        val r = radiusPx
         val stroke = Stroke(width = 2f)
+
         fun segColor(on: Boolean) = if (on) onColor else offColor
 
         // a: top
         drawRoundRect(
             color = segColor(active[0]),
-            topLeft = Offset(t.toPx(), 0f),
-            size = Size(size.width - 2 * t.toPx(), t.toPx()),
-            cornerRadius = CornerRadius(radius.toPx(), radius.toPx())
+            topLeft = Offset(t, 0f),
+            size = Size(size.width - 2 * t, t),
+            cornerRadius = CornerRadius(r, r)
         )
-
         // d: bottom
         drawRoundRect(
             color = segColor(active[3]),
-            topLeft = Offset(t.toPx(), size.height - t.toPx()),
-            size = Size(size.width - 2 * t.toPx(), t.toPx()),
-            cornerRadius = CornerRadius(radius.toPx(), radius.toPx())
+            topLeft = Offset(t, size.height - t),
+            size = Size(size.width - 2 * t, t),
+            cornerRadius = CornerRadius(r, r)
         )
-
         // g: middle
         drawRoundRect(
             color = segColor(active[6]),
-            topLeft = Offset(t.toPx(), size.height / 2f - t.toPx() / 2f),
-            size = Size(size.width - 2 * t.toPx(), t.toPx()),
-            cornerRadius = CornerRadius(radius.toPx(), radius.toPx())
+            topLeft = Offset(t, size.height / 2f - t / 2f),
+            size = Size(size.width - 2 * t, t),
+            cornerRadius = CornerRadius(r, r)
         )
-
         // f: upper-left
         drawRoundRect(
             color = segColor(active[5]),
-            topLeft = Offset(0f, t.toPx()),
-            size = Size(t.toPx(), size.height / 2f - t.toPx()),
-            cornerRadius = CornerRadius(radius.toPx(), radius.toPx())
+            topLeft = Offset(0f, t),
+            size = Size(t, size.height / 2f - t),
+            cornerRadius = CornerRadius(r, r)
         )
-
         // e: lower-left
         drawRoundRect(
             color = segColor(active[4]),
             topLeft = Offset(0f, size.height / 2f),
-            size = Size(t.toPx(), size.height / 2f - t.toPx()),
-            cornerRadius = CornerRadius(radius.toPx(), radius.toPx())
+            size = Size(t, size.height / 2f - t),
+            cornerRadius = CornerRadius(r, r)
         )
-
         // b: upper-right
         drawRoundRect(
             color = segColor(active[1]),
-            topLeft = Offset(size.width - t.toPx(), t.toPx()),
-            size = Size(t.toPx(), size.height / 2f - t.toPx()),
-            cornerRadius = CornerRadius(radius.toPx(), radius.toPx())
+            topLeft = Offset(size.width - t, t),
+            size = Size(t, size.height / 2f - t),
+            cornerRadius = CornerRadius(r, r)
         )
-
         // c: lower-right
         drawRoundRect(
             color = segColor(active[2]),
-            topLeft = Offset(size.width - t.toPx(), size.height / 2f),
-            size = Size(t.toPx(), size.height / 2f - t.toPx()),
-            cornerRadius = CornerRadius(radius.toPx(), radius.toPx())
+            topLeft = Offset(size.width - t, size.height / 2f),
+            size = Size(t, size.height / 2f - t),
+            cornerRadius = CornerRadius(r, r)
         )
 
-        // Thin white outline (optional – adds punch)
+        // subtle outline
         drawRoundRect(
             color = Color.White.copy(alpha = 0.10f),
             topLeft = Offset(0f, 0f),
             size = Size(size.width, size.height),
             style = stroke,
-            cornerRadius = CornerRadius(radius.toPx(), radius.toPx())
+            cornerRadius = CornerRadius(r, r)
         )
     }
 }
