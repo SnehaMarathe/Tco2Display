@@ -52,13 +52,12 @@ class MainActivity : ComponentActivity() {
             val vm: Tco2ViewModel = viewModel()
             val tco2 by vm.tco2.collectAsState()
 
-            // Colors like your mock
             val bg = Color(0xFF000000)
-            val white = Color.White
-            val greenAccent = Color(0xFF39D353)
+            val white = Color(0xFFD0D0D0)  // subtle grey-white like your mock
+            val green = Color(0xFF39D353)
 
-            // Load the seven-seg font
-            val techFont = FontFamily(Font(resId = R.font.technology_bold, weight = FontWeight.Bold))
+            // seven-segment font
+            val techFont = FontFamily(Font(R.font.technology_bold, weight = FontWeight.Bold))
 
             Box(
                 modifier = Modifier
@@ -69,21 +68,23 @@ class MainActivity : ComponentActivity() {
                 // ── BLUE ENERGY MOTORS ──
                 TopBar(title = "BLUE ENERGY MOTORS", color = white, lineThickness = 3.dp)
 
-                // Auto-fit number centered
+                // Fixed-size, one-line number (no leading zeros; last digit green)
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
                         .fillMaxWidth()
                 ) {
-                    FitNumberWithFontOneLine(
+                    FixedSizeSevenSegNumber(
                         value = tco2,
                         fontFamily = techFont,
                         intAndFirstTwoColor = white,
-                        lastDigitColor = greenAccent,
+                        lastDigitColor = green,
+                        // choose the *maximum* integer length you expect (for sizing once)
+                        maxIntegerDigits = 7,
                         baseMinSp = 48f,
-                        baseMaxSp = 420f,   // allow very large on wide displays
+                        baseMaxSp = 420f,
                         lastDigitScale = 1.22f,
-                        letterSpacingSp = 0f // adjust if you want tighter/looser spacing
+                        letterSpacingSp = 0f
                     )
                 }
 
@@ -139,102 +140,118 @@ private fun TopBar(title: String, color: Color, lineThickness: Dp) {
 }
 
 /**
- * Auto-scales a 3-decimal number into one line using the provided font.
- * - Integer + '.' + first two decimals: intAndFirstTwoColor
- * - Last decimal: lastDigitColor and bigger (lastDigitScale)
- * - When value=null, shows 0000000.000 padded to 7 int digits (change if needed).
+ * Fixed-size (constant) seven-seg number:
+ * - Computes the font size **once per layout size** using a *reference template*
+ *   (e.g., "8888888.88X", where X is scaled as last digit).
+ * - Then reuses that size for all subsequent value updates → no spacing jumps.
+ * - Removes **all leading zeros** (but keeps "0" if the integer part is zero).
  */
 @Composable
-private fun FitNumberWithFontOneLine(
+private fun FixedSizeSevenSegNumber(
     value: Double?,
     fontFamily: FontFamily,
     intAndFirstTwoColor: Color,
     lastDigitColor: Color,
+    maxIntegerDigits: Int,
     baseMinSp: Float,
     baseMaxSp: Float,
     lastDigitScale: Float,
     letterSpacingSp: Float = 0f,
-    integerDigits: Int = 7,
     fractionDigits: Int = 3
 ) {
     val measurer = rememberTextMeasurer()
+
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val maxWidthPx = with(LocalDensity.current) { maxWidth.toPx() }.roundToInt()
+        val density = LocalDensity.current
+        val maxWidthPx = with(density) { maxWidth.toPx() }.roundToInt()
         val constraints = Constraints(maxWidth = maxWidthPx)
 
-        // Build formatted content
-        fun format(value: Double?): Triple<String, String, String> {
-            return if (value == null) {
-                val intStr = "0".repeat(integerDigits)
-                val fracStr = "0".repeat(fractionDigits)
-                Triple(intStr, ".", fracStr)
-            } else {
-                val s = String.format(Locale.US, "%.3f", value)
-                val dot = s.indexOf('.')
-                val intPart = if (dot >= 0) s.substring(0, dot) else s
-                val frac = if (dot >= 0) s.substring(dot + 1) else ""
-                Triple(
-                    intPart.padStart(integerDigits, '0').takeLast(integerDigits),
-                    ".",
-                    frac.padEnd(fractionDigits, '0').take(fractionDigits)
-                )
-            }
-        }
-
-        val (intPart, dot, fracPart) = format(value)
-
-        fun styled(baseSp: Float) = buildAnnotatedString {
-            // integer
+        // Build worst-case template (for sizing once): all 8s (widest),
+        // dot, first two decimals as 8, and last decimal scaled (represented by 'X').
+        fun templateStyled(baseSp: Float) = buildAnnotatedString {
+            // integer part (max columns)
             withStyle(SpanStyle(color = intAndFirstTwoColor, fontSize = baseSp.sp)) {
-                append(intPart)
+                append("8".repeat(maxIntegerDigits))
             }
-            // dot + first two decimals
-            if (fracPart.isNotEmpty()) {
-                withStyle(SpanStyle(color = intAndFirstTwoColor, fontSize = baseSp.sp)) {
-                    append(dot)
-                    append(fracPart.substring(0, 2))
-                }
-                // last decimal
-                withStyle(
-                    SpanStyle(
-                        color = lastDigitColor,
-                        fontSize = (baseSp * lastDigitScale).sp
-                    )
-                ) {
-                    append(fracPart.last().toString())
-                }
+            // '.' + first two decimals as 8
+            withStyle(SpanStyle(color = intAndFirstTwoColor, fontSize = baseSp.sp)) {
+                append(".")
+                append("88")
             }
+            // last decimal bigger
+            withStyle(
+                SpanStyle(
+                    color = lastDigitColor,
+                    fontSize = (baseSp * lastDigitScale).sp
+                )
+            ) { append("8") }
         }
 
-        // Binary-search the largest base size that fits width (one line)
-        var low = baseMinSp
-        var high = baseMaxSp
-        var best = low
-        repeat(12) {
-            val mid = (low + high) / 2f
-            val text = styled(mid)
-            val res = measurer.measure(
-                text = text,
-                style = TextStyle(
-                    fontFamily = fontFamily,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = letterSpacingSp.sp
-                ),
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Clip,
-                constraints = constraints
-            )
-            if (!res.didOverflowWidth) {
-                best = mid
-                low = mid
-            } else {
-                high = mid
+        // Binary-search the **base** size ONCE per layout (constraints key)
+        val baseSizeSp = rememberTextMeasurer().let {
+            var low = baseMinSp
+            var high = baseMaxSp
+            var best = low
+            repeat(12) {
+                val mid = (low + high) / 2f
+                val res = measurer.measure(
+                    text = templateStyled(mid),
+                    style = TextStyle(
+                        fontFamily = fontFamily,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = letterSpacingSp.sp
+                    ),
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Clip,
+                    constraints = constraints
+                )
+                if (!res.didOverflowWidth) {
+                    best = mid
+                    low = mid
+                } else {
+                    high = mid
+                }
             }
+            best
+        }
+
+        // Format actual value (remove leading zeros)
+        val display = run {
+            if (value == null) "0.000"
+            else String.format(Locale.US, "%.3f", value)
+        }
+        val dot = display.indexOf('.')
+        val rawInt = if (dot >= 0) display.substring(0, dot) else display
+        val trimmedInt = rawInt.replaceFirst(Regex("^0+(?!$)"), "") // drop all leading zeros, keep one zero
+        val frac = if (dot >= 0) display.substring(dot + 1) else "000"
+        val firstTwo = frac.take(2).padEnd(2, '0')
+        val lastDigit = if (frac.isNotEmpty()) frac.last().toString() else "0"
+
+        // Build the visible text using the **fixed** base size
+        val styled = buildAnnotatedString {
+            withStyle(
+                SpanStyle(
+                    color = intAndFirstTwoColor,
+                    fontSize = baseSizeSp.sp
+                )
+            ) { append(trimmedInt) }
+            withStyle(
+                SpanStyle(
+                    color = intAndFirstTwoColor,
+                    fontSize = baseSizeSp.sp
+                )
+            ) { append("."); append(firstTwo) }
+            withStyle(
+                SpanStyle(
+                    color = lastDigitColor,
+                    fontSize = (baseSizeSp * lastDigitScale).sp
+                )
+            ) { append(lastDigit) }
         }
 
         Text(
-            text = styled(best),
+            text = styled,
             color = Color.White,
             textAlign = TextAlign.Center,
             maxLines = 1,
