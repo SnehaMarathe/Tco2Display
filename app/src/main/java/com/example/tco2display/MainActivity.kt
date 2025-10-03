@@ -1,6 +1,7 @@
 package com.example.tco2display
 
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -43,6 +44,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Keep screen on while this Activity is visible
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         // Fullscreen (hide system bars)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val controller = WindowInsetsControllerCompat(window, window.decorView)
@@ -55,11 +59,10 @@ class MainActivity : ComponentActivity() {
             val tco2 by vm.tco2.collectAsState()
 
             val bg = Color(0xFF000000)
-            val lit = Color(0xFFFFFFFF)                 // BRIGHT white for digits
-            val ghost = Color.White.copy(alpha = 0.10f)  // even fainter ghost digits
+            val lit = Color(0xFFFFFFFF)                 // bright white digits
+            val ghost = Color.White.copy(alpha = 0.10f)  // faint ghost digits
             val green = Color(0xFF39D353)               // last decimal
 
-            // seven-segment font for the number
             val segFont = FontFamily(Font(R.font.technology_bold, weight = FontWeight.Bold))
 
             Box(
@@ -68,10 +71,10 @@ class MainActivity : ComponentActivity() {
                     .background(bg)
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                // ── BLUE ENERGY MOTORS ──
+                // ── BLUE ENERGY MOTORS (slightly bigger) ──
                 TopBar(title = "BLUE ENERGY MOTORS", color = lit.copy(alpha = 0.82f), lineThickness = 3.dp)
 
-                // Big number (larger, bright white; very faint ghost; last digit green)
+                // Big number
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -83,16 +86,14 @@ class MainActivity : ComponentActivity() {
                         textColor = lit,
                         ghostColor = ghost,
                         lastDigitColor = green,
-                        // Sizing now uses the *current* integer digit count to grow larger.
-                        // Keep these wide so width is the only limiter.
                         baseMinSp = 24f,
-                        baseMaxSp = 2000f,
+                        baseMaxSp = 2000f,     // effectively uncapped; width decides
                         lastDigitScale = 1.22f,
                         letterSpacingSp = 0f
                     )
                 }
 
-                // Bottom caption in a NORMAL font (not seven-seg)
+                // Bottom caption in normal font
                 Text(
                     text = "CARBON SAVING IN tCO2",
                     color = lit.copy(alpha = 0.82f),
@@ -129,7 +130,7 @@ private fun TopBar(title: String, color: Color, lineThickness: Dp) {
         Text(
             text = title,
             color = color,
-            fontSize = 22.sp,
+            fontSize = 28.sp, // ← slightly bigger title
             fontWeight = FontWeight.ExtraBold,
             modifier = Modifier.padding(horizontal = 12.dp),
             textAlign = TextAlign.Center
@@ -164,7 +165,7 @@ private fun FixedSizeSegFontWithGhost(
         val maxWidthPx = with(LocalDensity.current) { maxWidth.toPx() }.roundToInt()
         val constraints = Constraints(maxWidth = maxWidthPx)
 
-        // Build actual value first so we know the current integer digit count.
+        // Build current value so we know the visible integer length
         val display = if (value == null) "0.${"0".repeat(fractionDigits)}"
         else String.format(Locale.US, "%.${fractionDigits}f", value)
 
@@ -174,11 +175,11 @@ private fun FixedSizeSegFontWithGhost(
         val curIntDigits = max(trimmedInt.length, 1)
 
         val frac = if (dot >= 0) display.substring(dot + 1).padEnd(fractionDigits, '0')
-                   else "0".repeat(fractionDigits)
+        else "0".repeat(fractionDigits)
         val firstTwo = frac.take(2)
         val last = frac.last().toString()
 
-        // 1) Size using a template **matching the current digit count**
+        // Size using a template matching the current digit count
         fun template(baseSp: Float) = buildAnnotatedString {
             withStyle(SpanStyle(fontSize = baseSp.sp)) { append("8".repeat(curIntDigits)) }
             withStyle(SpanStyle(fontSize = baseSp.sp)) { append("."); append("88") }
@@ -197,7 +198,6 @@ private fun FixedSizeSegFontWithGhost(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = letterSpacingSp.sp,
                     platformStyle = PlatformTextStyle(includeFontPadding = false),
-                    // if supported, keep equal digit widths
                     fontFeatureSettings = "tnum"
                 ),
                 maxLines = 1,
@@ -208,21 +208,18 @@ private fun FixedSizeSegFontWithGhost(
             if (!res.didOverflowWidth) { best = mid; low = mid } else { high = mid }
         }
 
-        // 2) GHOST for present digits only
         val ghostText = buildAnnotatedString {
             withStyle(SpanStyle(fontSize = best.sp)) { append("8".repeat(curIntDigits)) }
             withStyle(SpanStyle(fontSize = best.sp)) { append("."); append("88") }
             withStyle(SpanStyle(fontSize = (best * lastDigitScale).sp)) { append("8") }
         }
 
-        // 3) ACTUAL number (bright white) with green last digit
         val actualText = buildAnnotatedString {
             withStyle(SpanStyle(color = textColor, fontSize = best.sp)) { append(trimmedInt) }
             withStyle(SpanStyle(color = textColor, fontSize = best.sp)) { append("."); append(firstTwo) }
             withStyle(SpanStyle(color = lastDigitColor, fontSize = (best * lastDigitScale).sp)) { append(last) }
         }
 
-        // Ghost first (very faint), then actual
         Text(
             text = ghostText,
             color = ghostColor,
