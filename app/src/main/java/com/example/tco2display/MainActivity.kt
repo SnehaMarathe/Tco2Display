@@ -54,11 +54,10 @@ class MainActivity : ComponentActivity() {
             val tco2 by vm.tco2.collectAsState()
 
             val bg = Color(0xFF000000)
-            val white = Color(0xFFD0D0D0)               // lit segments
-            val ghost = Color.White.copy(alpha = 0.18f)  // very light “off” segments
+            val lit = Color(0xFFD0D0D0)                 // lit digits
+            val ghost = Color.White.copy(alpha = 0.18f)  // faint ghost digits
             val green = Color(0xFF39D353)               // last decimal
 
-            // seven-segment font you’re using
             val segFont = FontFamily(Font(R.font.technology_bold, weight = FontWeight.Bold))
 
             Box(
@@ -67,10 +66,8 @@ class MainActivity : ComponentActivity() {
                     .background(bg)
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                // ── BLUE ENERGY MOTORS ──
-                TopBar(title = "BLUE ENERGY MOTORS", color = white, lineThickness = 3.dp)
+                TopBar(title = "BLUE ENERGY MOTORS", color = lit, lineThickness = 3.dp)
 
-                // Big number: constant size (no cap), ghost layer, last digit green
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -79,21 +76,20 @@ class MainActivity : ComponentActivity() {
                     FixedSizeSegFontWithGhost(
                         value = tco2,
                         fontFamily = segFont,
-                        textColor = white,
+                        textColor = lit,
                         ghostColor = ghost,
                         lastDigitColor = green,
-                        maxIntegerDigits = 7,       // bump if you need more integer places
+                        maxIntegerDigits = 7,    // increase if you’ll exceed 7 integer digits
                         baseMinSp = 24f,
-                        baseMaxSp = 1500f,          // << effectively NO cap — width decides
+                        baseMaxSp = 1500f,       // no cap; width decides
                         lastDigitScale = 1.22f,
                         letterSpacingSp = 0f
                     )
                 }
 
-                // Bottom caption
                 Text(
                     text = "CARBON SAVINGS tCO2",
-                    color = white,
+                    color = lit,
                     fontFamily = segFont,
                     fontWeight = FontWeight.Bold,
                     fontSize = 22.sp,
@@ -141,7 +137,7 @@ private fun TopBar(title: String, color: Color, lineThickness: Dp) {
     }
 }
 
-/*──────────────  Number with constant size + ghost layer (no cap)  ─────────────*/
+/*──────────────  Number with constant size + ghost layer (only for present digits) ─────────────*/
 
 @Composable
 private fun FixedSizeSegFontWithGhost(
@@ -163,14 +159,13 @@ private fun FixedSizeSegFontWithGhost(
         val maxWidthPx = with(LocalDensity.current) { maxWidth.toPx() }.roundToInt()
         val constraints = Constraints(maxWidth = maxWidthPx)
 
-        // Template for sizing (all 8’s are widest)
+        // 1) Size once using the widest template (max digits) so the font size stays constant.
         fun template(baseSp: Float) = buildAnnotatedString {
             withStyle(SpanStyle(fontSize = baseSp.sp)) { append("8".repeat(maxIntegerDigits)) }
             withStyle(SpanStyle(fontSize = baseSp.sp)) { append("."); append("88") }
             withStyle(SpanStyle(fontSize = (baseSp * lastDigitScale).sp)) { append("8") }
         }
 
-        // Binary-search: largest size that fits ONE line by width (no height/percent cap)
         var low = baseMinSp
         var high = baseMaxSp
         var best = low
@@ -183,7 +178,7 @@ private fun FixedSizeSegFontWithGhost(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = letterSpacingSp.sp,
                     platformStyle = PlatformTextStyle(includeFontPadding = false),
-                    fontFeatureSettings = "tnum" // tabular numerals if supported
+                    fontFeatureSettings = "tnum"
                 ),
                 maxLines = 1,
                 softWrap = false,
@@ -193,25 +188,34 @@ private fun FixedSizeSegFontWithGhost(
             if (!res.didOverflowWidth) { best = mid; low = mid } else { high = mid }
         }
 
-        // Build actual number (trim leading zeros but keep one)
+        // 2) Build the actual number (trim leading zeros but keep one zero)
         val display = if (value == null) "0.${"0".repeat(fractionDigits)}"
-                      else String.format(Locale.US, "%.${fractionDigits}f", value)
+        else String.format(Locale.US, "%.${fractionDigits}f", value)
+
         val dot = display.indexOf('.')
         val rawInt = if (dot >= 0) display.substring(0, dot) else display
         val trimmedInt = rawInt.replaceFirst(Regex("^0+(?!$)"), "").ifEmpty { "0" }
+
         val frac = if (dot >= 0) display.substring(dot + 1).padEnd(fractionDigits, '0')
                    else "0".repeat(fractionDigits)
         val firstTwo = frac.take(2)
         val last = frac.last().toString()
 
-        // Ghost layer (full template) then actual
-        val ghostText = template(best)
+        // 3) GHOST LAYER: only for **present digits** (no leading placeholders).
+        val ghostText = buildAnnotatedString {
+            withStyle(SpanStyle(fontSize = best.sp)) { append("8".repeat(trimmedInt.length)) }
+            withStyle(SpanStyle(fontSize = best.sp)) { append("."); append("88") }
+            withStyle(SpanStyle(fontSize = (best * lastDigitScale).sp)) { append("8") }
+        }
+
+        // 4) ACTUAL LAYER: real number with last digit green and bigger.
         val actualText = buildAnnotatedString {
             withStyle(SpanStyle(color = textColor, fontSize = best.sp)) { append(trimmedInt) }
             withStyle(SpanStyle(color = textColor, fontSize = best.sp)) { append("."); append(firstTwo) }
             withStyle(SpanStyle(color = lastDigitColor, fontSize = (best * lastDigitScale).sp)) { append(last) }
         }
 
+        // Draw ghost (faint), then the actual value on top — centered & single line.
         Text(
             text = ghostText,
             color = ghostColor,
