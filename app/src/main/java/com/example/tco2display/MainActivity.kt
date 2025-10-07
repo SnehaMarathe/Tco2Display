@@ -45,7 +45,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Keep screen awake
+        // Keep the screen awake
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         // Immersive fullscreen
@@ -60,9 +60,11 @@ class MainActivity : ComponentActivity() {
             val tco2 by vm.tco2.collectAsState()
 
             val bg = Color(0xFF000000)
-            val lit = Color(0xFFFFFFFF)
-            val ghost = Color.White.copy(alpha = 0.10f)
-            val green = Color(0xFF39D353)
+            val lit = Color(0xFFFFFFFF)                 // bright white
+            val ghost = Color.White.copy(alpha = 0.10f)  // faint segments
+            val green = Color(0xFF39D353)               // last digit
+
+            // Seven-segment style font (put at res/font/technology_bold.ttf)
             val segFont = FontFamily(Font(R.font.technology_bold, weight = FontWeight.Bold))
 
             Column(
@@ -71,7 +73,7 @@ class MainActivity : ComponentActivity() {
                     .background(bg)
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                // Top banner
+                // Top banner — CO2 SAVINGS in Tons with BLUE ENERGY MOTORS —
                 TopLineWithBrand(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -81,7 +83,7 @@ class MainActivity : ComponentActivity() {
 
                 Spacer(Modifier.height(12.dp))
 
-                // Big digits in a weighted center box (prevents overlap)
+                // Big digits centered (weighted area so the footer never overlaps)
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -95,14 +97,14 @@ class MainActivity : ComponentActivity() {
                         ghostColor = ghost,
                         lastDigitColor = green,
                         baseMinSp = 24f,
-                        baseMaxSp = 2000f,
+                        baseMaxSp = 2000f, // practically uncapped; width decides
                         lastDigitScale = 1.22f,
                         letterSpacingSp = 0f
                     )
                 }
 
-                // Bottom meaning card
-                WhatThisMeansCard(
+                // Single bottom line: “Equivalent to Planting XXX 🌳”
+                WhatThisMeansRowSingle(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 10.dp),
@@ -174,6 +176,7 @@ private fun FixedSizeSegFontWithGhost(
         val maxWidthPx = with(LocalDensity.current) { maxWidth.toPx() }.roundToInt()
         val constraints = Constraints(maxWidth = maxWidthPx)
 
+        // Format value and split into parts
         val display = if (value == null) "0.${"0".repeat(fractionDigits)}"
         else String.format(Locale.US, "%.${fractionDigits}f", value)
 
@@ -187,12 +190,14 @@ private fun FixedSizeSegFontWithGhost(
         val firstTwo = frac.take(2)
         val last = frac.last().toString()
 
+        // sizing template for the *current* digit count
         fun template(baseSp: Float) = buildAnnotatedString {
             withStyle(SpanStyle(fontSize = baseSp.sp)) { append("8".repeat(curIntDigits)) }
             withStyle(SpanStyle(fontSize = baseSp.sp)) { append("."); append("88") }
             withStyle(SpanStyle(fontSize = (baseSp * lastDigitScale).sp)) { append("8") }
         }
 
+        // Binary-search base size; memoized by width and digit count
         val baseSizeSp = remember(maxWidthPx, curIntDigits) {
             var low = baseMinSp
             var high = baseMaxSp
@@ -218,12 +223,14 @@ private fun FixedSizeSegFontWithGhost(
             best
         }
 
+        // Ghost (for present digits only)
         val ghostText = buildAnnotatedString {
             withStyle(SpanStyle(fontSize = baseSizeSp.sp)) { append("8".repeat(curIntDigits)) }
             withStyle(SpanStyle(fontSize = baseSizeSp.sp)) { append("."); append("88") }
             withStyle(SpanStyle(fontSize = (baseSizeSp * lastDigitScale).sp)) { append("8") }
         }
 
+        // Actual number (last digit large + green)
         val actualText = buildAnnotatedString {
             withStyle(SpanStyle(color = textColor, fontSize = baseSizeSp.sp)) { append(trimmedInt) }
             withStyle(SpanStyle(color = textColor, fontSize = baseSizeSp.sp)) { append("."); append(firstTwo) }
@@ -263,37 +270,33 @@ private fun FixedSizeSegFontWithGhost(
     }
 }
 
-/* ───────────────────── Bottom meaning / trees ───────────────────── */
+/* ───────────────────── Single-line bottom row ───────────────────── */
 
 @Composable
-private fun WhatThisMeansCard(modifier: Modifier, tco2: Double?, color: Color) {
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = "What This Means",
-            color = color.copy(alpha = 0.9f),
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Medium
-        )
-        Text(text = "🌳", fontSize = 44.sp)
+private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Color) {
+    // Lifetime storage ~0.5–1.0 tCO2 per tree ⇒ ≈1–2 trees per ton; show midpoint
+    val tons = tco2 ?: 0.0
+    val minTrees = ceil(tons / 1.0).toInt()
+    val maxTrees = ceil(tons / 0.5).toInt()
+    val midTrees = ((minTrees + maxTrees) / 2.0).roundToInt()
+    val nf = remember(midTrees) { NumberFormat.getIntegerInstance(Locale.US) }
 
-        // Midpoint trees: between 1–2 trees per ton (0.5–1.0 tCO2 per tree lifetime)
-        val tons = tco2 ?: 0.0
-        val minTrees = ceil(tons / 1.0).toInt()
-        val maxTrees = ceil(tons / 0.5).toInt()
-        val midTrees = ((minTrees + maxTrees) / 2.0).roundToInt()
-        val nf = remember(midTrees) { NumberFormat.getIntegerInstance(Locale.US) }
-
-        val line = buildAnnotatedString {
-            withStyle(SpanStyle(color = color.copy(alpha = 0.9f), fontSize = 22.sp)) {
-                append("Equivalent to ")
-            }
-            withStyle(SpanStyle(color = color, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)) {
-                append(nf.format(midTrees))
-            }
-            withStyle(SpanStyle(color = color.copy(alpha = 0.9f), fontSize = 22.sp)) {
-                append(" trees planted")
-            }
+    val line = buildAnnotatedString {
+        withStyle(SpanStyle(color = color.copy(alpha = 0.9f), fontSize = 22.sp)) {
+            append("Equivalent to Planting ")
         }
-        Text(text = line, textAlign = TextAlign.Center)
+        withStyle(SpanStyle(color = color, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)) {
+            append(nf.format(midTrees))
+        }
+        withStyle(SpanStyle(fontSize = 28.sp)) { append(" 🌳") }
     }
+
+    Text(
+        text = line,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+    )
 }
