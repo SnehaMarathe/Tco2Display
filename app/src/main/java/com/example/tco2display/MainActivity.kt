@@ -1,6 +1,5 @@
 package com.example.tco2display
 
-import androidx.compose.runtime.remember
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -11,6 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,18 +37,18 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.tco2display.ui.Tco2ViewModel
 import java.text.NumberFormat
 import java.util.Locale
+import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // keep screen awake
+        // Keep screen awake for display use
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        // immersive fullscreen
+        // Immersive fullscreen
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val controller = WindowInsetsControllerCompat(window, window.decorView)
         controller.systemBarsBehavior =
@@ -60,9 +60,9 @@ class MainActivity : ComponentActivity() {
             val tco2 by vm.tco2.collectAsState()
 
             val bg = Color(0xFF000000)
-            val lit = Color(0xFFFFFFFF)                 // bright digits
-            val ghost = Color.White.copy(alpha = 0.10f)  // faint segments
-            val green = Color(0xFF39D353)
+            val lit = Color(0xFFFFFFFF)                 // bright white digits
+            val ghost = Color.White.copy(alpha = 0.10f)  // faint ghost digits
+            val green = Color(0xFF39D353)               // last decimal
 
             val segFont = FontFamily(Font(R.font.technology_bold, weight = FontWeight.Bold))
 
@@ -72,22 +72,15 @@ class MainActivity : ComponentActivity() {
                     .background(bg)
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                // Title bar
-                TopBar(
-                    title = "BLUE ENERGY MOTORS",
-                    color = lit.copy(alpha = 0.88f),
-                    lineThickness = 3.dp
-                )
-
-                // Subtitle just under the title
-                Subtitle(
+                // Top banner like mock:  — CO2 SAVINGS in Tons with BLUE ENERGY MOTORS —
+                TopLineWithBrand(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(top = 40.dp),
-                    color = lit
+                        .padding(top = 4.dp),
+                    color = lit.copy(alpha = 0.92f)
                 )
 
-                // Big number centered
+                // Big number in the middle
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -100,18 +93,18 @@ class MainActivity : ComponentActivity() {
                         ghostColor = ghost,
                         lastDigitColor = green,
                         baseMinSp = 24f,
-                        baseMaxSp = 2000f,
+                        baseMaxSp = 2000f, // effectively uncapped; width decides
                         lastDigitScale = 1.22f,
                         letterSpacingSp = 0f
                     )
                 }
 
-                // Bottom: What this means — tree — NNN trees planted
-                WhatThisMeansRow(
+                // Bottom “What This Means” + tree + “Equivalent to X–Y trees planted”
+                WhatThisMeansCard(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .padding(bottom = 12.dp),
+                        .padding(bottom = 10.dp),
                     tco2 = tco2,
                     color = lit
                 )
@@ -130,94 +123,38 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/* ───────────────────── UI Pieces ───────────────────── */
+/* ────────────────────────── Top banner ────────────────────────── */
 
 @Composable
-private fun TopBar(title: String, color: Color, lineThickness: Dp) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(lineThickness)
-                .background(color)
-        )
-        Text(
-            text = title,
-            color = color,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.ExtraBold,
-            modifier = Modifier.padding(horizontal = 12.dp),
-            textAlign = TextAlign.Center
-        )
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(lineThickness)
-                .background(color)
-        )
+private fun TopLineWithBrand(modifier: Modifier, color: Color, lineThickness: Dp = 3.dp) {
+    Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Box(Modifier.weight(1f).height(lineThickness).background(color))
+            val text = buildAnnotatedString {
+                withStyle(SpanStyle(color = color, fontSize = 28.sp, fontWeight = FontWeight.Medium)) {
+                    append("  CO2 ")
+                }
+                withStyle(SpanStyle(color = color, fontSize = 28.sp, fontWeight = FontWeight.Bold)) {
+                    append("SAVINGS")
+                }
+                withStyle(SpanStyle(color = color, fontSize = 28.sp, fontWeight = FontWeight.Normal)) {
+                    append(" in Tons with ")
+                }
+                withStyle(SpanStyle(color = color, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)) {
+                    append("BLUE ENERGY MOTORS")
+                }
+                append("  ")
+            }
+            Text(text = text, textAlign = TextAlign.Center)
+            Box(Modifier.weight(1f).height(lineThickness).background(color))
+        }
     }
 }
 
-@Composable
-private fun Subtitle(modifier: Modifier, color: Color) {
-    val text = buildAnnotatedString {
-        withStyle(SpanStyle(color = color, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)) {
-            append("CO2 ")
-        }
-        withStyle(SpanStyle(color = color, fontSize = 28.sp, fontWeight = FontWeight.Bold)) {
-            append("SAVINGS")
-        }
-        withStyle(SpanStyle(color = color, fontSize = 28.sp, fontWeight = FontWeight.Normal)) {
-            append(" in Tons")
-        }
-    }
-    Text(
-        text = text,
-        modifier = modifier,
-        textAlign = TextAlign.Center
-    )
-}
-
-/**
- * Bottom row:  "What This Means"   🌳   "XXX trees planted"
- * Trees = tCO2 × TREES_PER_TON (rounded). Tweak TREES_PER_TON if you want.
- */
-private const val TREES_PER_TON = 45 // ≈ trees to offset 1 tCO2/year (adjust as desired)
-
-@Composable
-private fun WhatThisMeansRow(modifier: Modifier, tco2: Double?, color: Color) {
-    val trees = ((tco2 ?: 0.0) * TREES_PER_TON).roundToInt()
-    val nf = remember(trees) { NumberFormat.getIntegerInstance(Locale.US) }
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = "What This Means",
-            color = color,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Medium
-        )
-        Text( // tree icon—no extra asset needed
-            text = "🌳",
-            fontSize = 42.sp
-        )
-        Text(
-            text = "${nf.format(trees)} trees planted",
-            color = color,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
-
-/* ─────────── Number with constant size + ghost (only for present digits) ─────────── */
+/* ───────── Number with constant size + ghost (only for present digits) ───────── */
 
 @Composable
 private fun FixedSizeSegFontWithGhost(
@@ -238,7 +175,7 @@ private fun FixedSizeSegFontWithGhost(
         val maxWidthPx = with(LocalDensity.current) { maxWidth.toPx() }.roundToInt()
         val constraints = Constraints(maxWidth = maxWidthPx)
 
-        // current value pieces
+        // Format current value and split
         val display = if (value == null) "0.${"0".repeat(fractionDigits)}"
         else String.format(Locale.US, "%.${fractionDigits}f", value)
 
@@ -252,15 +189,14 @@ private fun FixedSizeSegFontWithGhost(
         val firstTwo = frac.take(2)
         val last = frac.last().toString()
 
-        // sizing template for *current* digit count
+        // sizing template for current digit count
         fun template(baseSp: Float) = buildAnnotatedString {
             withStyle(SpanStyle(fontSize = baseSp.sp)) { append("8".repeat(curIntDigits)) }
             withStyle(SpanStyle(fontSize = baseSp.sp)) { append("."); append("88") }
             withStyle(SpanStyle(fontSize = (baseSp * lastDigitScale).sp)) { append("8") }
         }
 
-        // binary search font size (memoized by width & digit count)
-        val baseSizeSp = androidx.compose.runtime.remember(maxWidthPx, curIntDigits) {
+        val baseSizeSp = remember(maxWidthPx, curIntDigits) {
             var low = baseMinSp
             var high = baseMaxSp
             var best = low
@@ -327,5 +263,41 @@ private fun FixedSizeSegFontWithGhost(
             ),
             modifier = Modifier.fillMaxWidth()
         )
+    }
+}
+
+/* ───────────────────── Bottom meaning / trees ───────────────────── */
+
+@Composable
+private fun WhatThisMeansCard(modifier: Modifier, tco2: Double?, color: Color) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = "What This Means",
+            color = color,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Medium
+        )
+        Text(text = "🌳", fontSize = 50.sp) // tree icon
+
+        // Trees = tCO2 ÷ (0.5–1.0)  => range ≈ ceil(tCO2) to ceil(2×tCO2)
+        val tons = tco2 ?: 0.0
+        val minTrees = ceil(tons / 1.0).toInt()
+        val maxTrees = ceil(tons / 0.5).toInt()
+        val midTrees = ((minTrees + maxTrees) / 2.0).roundToInt()
+        val nf = remember(midTrees) { NumberFormat.getIntegerInstance(Locale.US) }
+        // val nf = remember(minTrees to maxTrees) { NumberFormat.getIntegerInstance(Locale.US) }
+
+        val line = buildAnnotatedString {
+            withStyle(SpanStyle(color = color, fontSize = 22.sp)) {
+                append("Equivalent to ")
+            }
+            withStyle(SpanStyle(color = color, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)) {
+                append(nf.format(midTrees))
+            }
+            withStyle(SpanStyle(color = color, fontSize = 22.sp)) {
+                append(" trees planted")
+            }
+        }
+        Text(text = line, textAlign = TextAlign.Center)
     }
 }
