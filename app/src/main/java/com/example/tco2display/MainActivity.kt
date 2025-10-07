@@ -1,20 +1,21 @@
 package com.example.tco2display
 
 import android.os.Bundle
-import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -29,41 +30,36 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.tco2display.ui.Tco2ViewModel
-import java.util.Locale
-import kotlin.math.max
-import kotlin.math.roundToInt
-
-// Immersive fullscreen helpers
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.tco2display.ui.Tco2ViewModel
+import java.util.Locale
+import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Keep screen on while this Activity is visible
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
-        // Fullscreen (hide system bars)
+        // Immersive fullscreen + keep screen on
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val controller = WindowInsetsControllerCompat(window, window.decorView)
         controller.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         controller.hide(WindowInsetsCompat.Type.systemBars())
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         setContent {
             val vm: Tco2ViewModel = viewModel()
             val tco2 by vm.tco2.collectAsState()
 
             val bg = Color(0xFF000000)
-            val lit = Color(0xFFFFFFFF)                 // bright white digits
-            val ghost = Color.White.copy(alpha = 0.10f)  // faint ghost digits
-            val green = Color(0xFF39D353)               // last decimal
+            val white = Color(0xFFFFFFFF)
+            val ghost = Color(0x1AFFFFFF)        // ~10% alpha
+            val green = Color(0xFF39D353)
 
-            val segFont = FontFamily(Font(R.font.technology_bold, weight = FontWeight.Bold))
+            val techFont = FontFamily(Font(R.font.technology_bold, weight = FontWeight.Bold))
 
             Box(
                 modifier = Modifier
@@ -71,50 +67,55 @@ class MainActivity : ComponentActivity() {
                     .background(bg)
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                // ── BLUE ENERGY MOTORS (slightly bigger) ──
-                TopBar(title = "BLUE ENERGY MOTORS", color = lit.copy(alpha = 0.82f), lineThickness = 3.dp)
+                // Title bar
+                TopBar(
+                    title = "BLUE ENERGY MOTORS",
+                    color = Color(0xFFD0D0D0),
+                    lineThickness = 3.dp,
+                    titleSize = 26.sp
+                )
 
-                // Big number
+                // Center number readout (fills width, one line)
                 Box(
                     modifier = Modifier
-                        .align(Alignment.Center)
                         .fillMaxWidth()
+                        .align(Alignment.Center),
+                    contentAlignment = Alignment.Center
                 ) {
-                    FixedSizeSegFontWithGhost(
+                    SevenSegSingleLine(
                         value = tco2,
-                        fontFamily = segFont,
-                        textColor = lit,
-                        ghostColor = ghost,
-                        lastDigitColor = green,
-                        baseMinSp = 24f,
-                        baseMaxSp = 2000f,     // effectively uncapped; width decides
+                        fontFamily = techFont,
+                        colorMain = white,
+                        colorGhost = ghost,
+                        colorLastDigit = green,
+                        maxIntegerDigits = 7,          // sizing anchor
                         lastDigitScale = 1.22f,
-                        letterSpacingSp = 0f
+                        letterSpacingSp = 0f,
+                        // NEW: show unit and make it 2× current size
+                        unitText = " tCO2",
+                        unitColor = white,
+                        unitScale = 2.0f               // << doubled
                     )
                 }
 
-                // Bottom caption in normal font
-                Text(
-                    text = "CARBON SAVING IN tCO2",
-                    color = lit.copy(alpha = 0.82f),
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 24.sp,
-                    textAlign = TextAlign.Center,
+                // Bottom truck animation (fully offscreen → across → offscreen)
+                TruckMarquee(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
+                        .align(Alignment.BottomStart)
                         .fillMaxWidth()
-                        .padding(bottom = 10.dp)
+                        .padding(bottom = 6.dp),
+                    imageWidthFraction = 0.65f,      // truck ~65% of screen width
+                    travelPaddingDp = 32.dp
                 )
             }
         }
     }
 }
 
-/*──────────────────────────  UI pieces  ─────────────────────────*/
+/* ───────────────────────────── UI pieces ───────────────────────────── */
 
 @Composable
-private fun TopBar(title: String, color: Color, lineThickness: Dp) {
+private fun TopBar(title: String, color: Color, lineThickness: Dp, titleSize: androidx.compose.ui.unit.TextUnit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -130,7 +131,7 @@ private fun TopBar(title: String, color: Color, lineThickness: Dp) {
         Text(
             text = title,
             color = color,
-            fontSize = 28.sp, // ← slightly bigger title
+            fontSize = titleSize,
             fontWeight = FontWeight.ExtraBold,
             modifier = Modifier.padding(horizontal = 12.dp),
             textAlign = TextAlign.Center
@@ -144,111 +145,181 @@ private fun TopBar(title: String, color: Color, lineThickness: Dp) {
     }
 }
 
-/*──────────────  Number with constant size + ghost (only for present digits) ─────────────*/
-
+/**
+ * Single-line seven-seg style number:
+ *  • Fills width (binary-search font size per layout; includes unit if present)
+ *  • Ghost “8” only for present digits (int digits + ".xx" + last)
+ *  • Last decimal bigger + green
+ *  • Optional unit with its own scale/color
+ */
 @Composable
-private fun FixedSizeSegFontWithGhost(
+private fun SevenSegSingleLine(
     value: Double?,
     fontFamily: FontFamily,
-    textColor: Color,
-    ghostColor: Color,
-    lastDigitColor: Color,
-    baseMinSp: Float,
-    baseMaxSp: Float,
+    colorMain: Color,
+    colorGhost: Color,
+    colorLastDigit: Color,
+    maxIntegerDigits: Int,
     lastDigitScale: Float,
-    letterSpacingSp: Float = 0f,
-    fractionDigits: Int = 3
+    letterSpacingSp: Float,
+    unitText: String? = null,
+    unitColor: Color = colorMain,
+    unitScale: Float = 1.0f,
+    baseMinSp: Float = 48f,
+    baseMaxSp: Float = 640f
 ) {
     val measurer = rememberTextMeasurer()
 
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val maxWidthPx = with(LocalDensity.current) { maxWidth.toPx() }.roundToInt()
+        val density = LocalDensity.current
+        val maxWidthPx = with(density) { maxWidth.toPx() }.roundToInt()
         val constraints = Constraints(maxWidth = maxWidthPx)
 
-        // Build current value so we know the visible integer length
-        val display = if (value == null) "0.${"0".repeat(fractionDigits)}"
-        else String.format(Locale.US, "%.${fractionDigits}f", value)
-
+        // format current value
+        val display = if (value == null) "0.000"
+                      else String.format(Locale.US, "%.3f", value)
         val dot = display.indexOf('.')
         val rawInt = if (dot >= 0) display.substring(0, dot) else display
         val trimmedInt = rawInt.replaceFirst(Regex("^0+(?!$)"), "").ifEmpty { "0" }
-        val curIntDigits = max(trimmedInt.length, 1)
+        val frac = if (dot >= 0) display.substring(dot + 1) else "000"
+        val firstTwo = frac.take(2).padEnd(2, '0')
+        val lastDigit = (frac.getOrNull(2) ?: '0').toString()
 
-        val frac = if (dot >= 0) display.substring(dot + 1).padEnd(fractionDigits, '0')
-        else "0".repeat(fractionDigits)
-        val firstTwo = frac.take(2)
-        val last = frac.last().toString()
-
-        // Size using a template matching the current digit count
+        // worst-case sizing template with “8” (widest) + optional unit
         fun template(baseSp: Float) = buildAnnotatedString {
-            withStyle(SpanStyle(fontSize = baseSp.sp)) { append("8".repeat(curIntDigits)) }
-            withStyle(SpanStyle(fontSize = baseSp.sp)) { append("."); append("88") }
-            withStyle(SpanStyle(fontSize = (baseSp * lastDigitScale).sp)) { append("8") }
+            withStyle(SpanStyle(color = colorMain, fontSize = baseSp.sp, fontWeight = FontWeight.Bold)) {
+                append("8".repeat(maxIntegerDigits))
+                append(".88")
+            }
+            withStyle(SpanStyle(color = colorLastDigit, fontSize = (baseSp * lastDigitScale).sp, fontWeight = FontWeight.Bold)) {
+                append("8")
+            }
+            if (!unitText.isNullOrEmpty()) {
+                withStyle(SpanStyle(color = unitColor, fontSize = (baseSp * unitScale).sp, fontWeight = FontWeight.Bold)) {
+                    append(unitText)
+                }
+            }
         }
 
-        var low = baseMinSp
-        var high = baseMaxSp
-        var best = low
-        repeat(14) {
-            val mid = (low + high) / 2f
-            val res = measurer.measure(
-                text = template(mid),
-                style = TextStyle(
-                    fontFamily = fontFamily,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = letterSpacingSp.sp,
-                    platformStyle = PlatformTextStyle(includeFontPadding = false),
-                    fontFeatureSettings = "tnum"
-                ),
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Clip,
-                constraints = constraints
+        // binary search font size to fit width (includes unit if present)
+        val baseSizeSp = run {
+            var lo = baseMinSp
+            var hi = baseMaxSp
+            var best = lo
+            repeat(14) {
+                val mid = (lo + hi) / 2f
+                val res = measurer.measure(
+                    text = template(mid),
+                    style = TextStyle(fontFamily = fontFamily, letterSpacing = letterSpacingSp.sp),
+                    maxLines = 1, softWrap = false, overflow = TextOverflow.Clip, constraints = constraints
+                )
+                if (!res.didOverflowWidth) { best = mid; lo = mid } else { hi = mid }
+            }
+            best
+        }
+
+        // ghost (only for present digits; no ghost for unit)
+        val ghostStyled = buildAnnotatedString {
+            withStyle(SpanStyle(color = colorGhost, fontSize = baseSizeSp.sp, fontWeight = FontWeight.Bold)) {
+                append("8".repeat(trimmedInt.length))
+                append(".88")
+            }
+            withStyle(SpanStyle(color = colorGhost, fontSize = (baseSizeSp * lastDigitScale).sp, fontWeight = FontWeight.Bold)) {
+                append("8")
+            }
+        }
+
+        // actual number + optional unit
+        val actualStyled = buildAnnotatedString {
+            withStyle(SpanStyle(color = colorMain, fontSize = baseSizeSp.sp, fontWeight = FontWeight.Bold)) {
+                append(trimmedInt)
+                append(".")
+                append(firstTwo)
+            }
+            withStyle(SpanStyle(color = colorLastDigit, fontSize = (baseSizeSp * lastDigitScale).sp, fontWeight = FontWeight.Bold)) {
+                append(lastDigit)
+            }
+            if (!unitText.isNullOrEmpty()) {
+                withStyle(SpanStyle(color = unitColor, fontSize = (baseSizeSp * unitScale).sp, fontWeight = FontWeight.Bold)) {
+                    append(unitText)
+                }
+            }
+        }
+
+        // Layer ghost behind actual text
+        Text(
+            text = ghostStyled,
+            color = colorGhost,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Clip,
+            style = TextStyle(fontFamily = fontFamily, letterSpacing = letterSpacingSp.sp),
+            modifier = Modifier.fillMaxWidth()
+        )
+        Text(
+            text = actualStyled,
+            color = colorMain,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Clip,
+            style = TextStyle(fontFamily = fontFamily, letterSpacing = letterSpacingSp.sp),
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+/** Bottom marquee that moves the truck fully offscreen → across → offscreen, looped. */
+@Composable
+private fun TruckMarquee(
+    modifier: Modifier,
+    imageWidthFraction: Float,
+    travelPaddingDp: Dp
+) {
+    BoxWithConstraints(modifier = modifier) {
+        val density = LocalDensity.current
+        val screenW = maxWidth
+        val truckW = screenW * imageWidthFraction
+        val travelPad = travelPaddingDp
+
+        val screenWPx = with(density) { screenW.toPx() }
+        val truckWPx = with(density) { truckW.toPx() }
+        val travelPadPx = with(density) { travelPad.toPx() }
+
+        val startX = -(truckWPx + travelPadPx)
+        val endX = screenWPx + travelPadPx
+
+        val x = remember { Animatable(startX) }
+
+        LaunchedEffect(screenWPx, truckWPx) {
+            while (true) {
+                x.snapTo(startX)
+                x.animateTo(
+                    targetValue = endX,
+                    animationSpec = tween(
+                        durationMillis = 10_000,
+                        easing = LinearEasing
+                    )
+                )
+            }
+        }
+
+        val xDp = with(density) { x.value.toDp() }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height((screenW * 0.18f).coerceAtMost(160.dp))
+        ) {
+            Spacer(modifier = Modifier.width(xDp))
+            Image(
+                painter = painterResource(id = R.drawable.truck_inverted),
+                contentDescription = "Truck",
+                modifier = Modifier
+                    .width(truckW)
+                    .fillMaxHeight()
             )
-            if (!res.didOverflowWidth) { best = mid; low = mid } else { high = mid }
         }
-
-        val ghostText = buildAnnotatedString {
-            withStyle(SpanStyle(fontSize = best.sp)) { append("8".repeat(curIntDigits)) }
-            withStyle(SpanStyle(fontSize = best.sp)) { append("."); append("88") }
-            withStyle(SpanStyle(fontSize = (best * lastDigitScale).sp)) { append("8") }
-        }
-
-        val actualText = buildAnnotatedString {
-            withStyle(SpanStyle(color = textColor, fontSize = best.sp)) { append(trimmedInt) }
-            withStyle(SpanStyle(color = textColor, fontSize = best.sp)) { append("."); append(firstTwo) }
-            withStyle(SpanStyle(color = lastDigitColor, fontSize = (best * lastDigitScale).sp)) { append(last) }
-        }
-
-        Text(
-            text = ghostText,
-            color = ghostColor,
-            maxLines = 1,
-            softWrap = false,
-            textAlign = TextAlign.Center,
-            style = TextStyle(
-                fontFamily = fontFamily,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = letterSpacingSp.sp,
-                platformStyle = PlatformTextStyle(includeFontPadding = false),
-                fontFeatureSettings = "tnum"
-            ),
-            modifier = Modifier.fillMaxWidth()
-        )
-        Text(
-            text = actualText,
-            color = textColor,
-            maxLines = 1,
-            softWrap = false,
-            textAlign = TextAlign.Center,
-            style = TextStyle(
-                fontFamily = fontFamily,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = letterSpacingSp.sp,
-                platformStyle = PlatformTextStyle(includeFontPadding = false),
-                fontFeatureSettings = "tnum"
-            ),
-            modifier = Modifier.fillMaxWidth()
-        )
     }
 }
