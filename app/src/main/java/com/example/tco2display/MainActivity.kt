@@ -1,5 +1,6 @@
 package com.example.tco2display
 
+import androidx.compose.runtime.remember
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
