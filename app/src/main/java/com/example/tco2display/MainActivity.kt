@@ -288,7 +288,7 @@ private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Col
         withStyle(SpanStyle(color = color, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)) {
             append(nf.format(midTrees))
         }
-        withStyle(SpanStyle(fontSize = 28.sp)) { append(" 🌳") }
+        withStyle(SpanStyle(fontSize = 50.sp)) { append(" 🌳") }
     }
 
     Text(
