@@ -290,7 +290,7 @@ private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Col
         }
         withStyle(SpanStyle(fontSize = 50.sp)) { append(" 🌳") }
 
-        withStyle(SpanStyle(fontSize = 50.sp)) { append(" Working for a Greener Future 🌿") }
+        withStyle(SpanStyle(fontSize = 22.sp)) { append(" Working for a Greener Future 🌿") }
     }
     
     Text(
