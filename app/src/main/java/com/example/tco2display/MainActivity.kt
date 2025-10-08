@@ -282,17 +282,17 @@ private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Col
     val nf = remember(midTrees) { NumberFormat.getIntegerInstance(Locale.US) }
 
     val line = buildAnnotatedString {
-        withStyle(SpanStyle(color = color.copy(alpha = 0.9f), fontSize = 22.sp)) {append("As Valuable To Our ")}
+        withStyle(SpanStyle(color = color.copy(alpha = 0.9f), fontSize = 22.sp)) {append("As Valuable As ")}
         
-        withStyle(SpanStyle(fontSize = 50.sp)) { append(" 🌎") }
+        // withStyle(SpanStyle(fontSize = 22.sp)) { append("🌎") }
 
-        withStyle(SpanStyle(color = color.copy(alpha = 0.9f), fontSize = 22.sp)) {append(" As ")}
+        // withStyle(SpanStyle(color = color.copy(alpha = 0.9f), fontSize = 22.sp)) {append(" As ")}
 
         withStyle(SpanStyle(color = color, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)) {append(nf.format(midTrees))}
         
-        withStyle(SpanStyle(fontSize = 50.sp)) { append(" 🌳") }
+        withStyle(SpanStyle(fontSize = 60.sp)) { append(" 🌳") }
         
-        withStyle(SpanStyle(color = color.copy(alpha = 0.9f), fontSize = 22.sp)) {append(" Working for a Greener Future ")}
+        withStyle(SpanStyle(color = color.copy(alpha = 0.9f), fontSize = 22.sp)) {append(" Towards Greener Future ")}
         
         withStyle(SpanStyle(fontSize = 22.sp)) { append("🌿") }
     }
