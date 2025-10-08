@@ -283,14 +283,16 @@ private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Col
 
     val line = buildAnnotatedString {
         withStyle(SpanStyle(color = color.copy(alpha = 0.9f), fontSize = 22.sp)) {
-            append("Equivalent to the Work of ")
+            append("As Valuable to 🌎 as ")
         }
         withStyle(SpanStyle(color = color, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)) {
             append(nf.format(midTrees))
         }
         withStyle(SpanStyle(fontSize = 50.sp)) { append(" 🌳") }
-    }
 
+        withStyle(SpanStyle(fontSize = 50.sp)) { append(" Working for a Greener Future 🌿") }
+    }
+    
     Text(
         text = line,
         textAlign = TextAlign.Center,
