@@ -40,16 +40,11 @@ import java.util.Locale
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.roundToInt
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.inlineContent
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.intl.Locale
+
+// NEW imports for inline placeholder
+import androidx.compose.ui.text.InlineTextContent
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
-import androidx.compose.ui.text.InlineTextContent
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -113,7 +108,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                // Single bottom line: “Equivalent to Planting XXX 🌳”
+                // Single bottom line: “Equivalent to Planting XXX 🌳” (emoji bottom-aligned)
                 WhatThisMeansRowSingle(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -280,35 +275,34 @@ private fun FixedSizeSegFontWithGhost(
     }
 }
 
-/* ───────────────────── Single-line bottom row ───────────────────── */
+/* ───────────────────── Single-line bottom row (baseline aligned tree) ───────────────────── */
 
 @Composable
 private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Color) {
-    // midpoint: ~1–2 trees per ton (0.5–1.0 tCO2 per tree lifetime)
+    // Lifetime storage ~0.5–1.0 tCO2 per tree ⇒ ≈1–2 trees per ton; midpoint
     val tons = tco2 ?: 0.0
     val minTrees = ceil(tons / 1.0).toInt()
     val maxTrees = ceil(tons / 0.5).toInt()
     val midTrees = ((minTrees + maxTrees) / 2.0).roundToInt()
-    val nf = remember(midTrees) { NumberFormat.getIntegerInstance(java.util.Locale.US) }
+    val nf = remember(midTrees) { NumberFormat.getIntegerInstance(Locale.US) }
 
-    // Build one line with an inline composable for the tree, bottom aligned
     val text = buildAnnotatedString {
         withStyle(SpanStyle(color = color.copy(alpha = 0.9f), fontSize = 22.sp)) {
-            append("Equivalent to the Work of ")
+            append("Equivalent to Planting ")
         }
         withStyle(SpanStyle(color = color, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)) {
             append(nf.format(midTrees))
             append(" ")
         }
-        appendInlineContent("tree") // placeholder id
+        appendInlineContent("tree") // inline, bottom-aligned
     }
 
     val inline = mapOf(
         "tree" to InlineTextContent(
             placeholder = Placeholder(
-                width = 32.sp,            // size of the emoji box
+                width = 32.sp,
                 height = 32.sp,
-                placeholderVerticalAlign = PlaceholderVerticalAlign.Bottom // <- bottom align
+                placeholderVerticalAlign = PlaceholderVerticalAlign.Bottom
             )
         ) {
             Text("🌳", fontSize = 50.sp)
