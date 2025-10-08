@@ -40,6 +40,16 @@ import java.util.Locale
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.roundToInt
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.inlineContent
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.intl.Locale
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.InlineTextContent
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -274,25 +284,40 @@ private fun FixedSizeSegFontWithGhost(
 
 @Composable
 private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Color) {
-    // Lifetime storage ~0.5–1.0 tCO2 per tree ⇒ ≈1–2 trees per ton; show midpoint
+    // midpoint: ~1–2 trees per ton (0.5–1.0 tCO2 per tree lifetime)
     val tons = tco2 ?: 0.0
     val minTrees = ceil(tons / 1.0).toInt()
     val maxTrees = ceil(tons / 0.5).toInt()
     val midTrees = ((minTrees + maxTrees) / 2.0).roundToInt()
-    val nf = remember(midTrees) { NumberFormat.getIntegerInstance(Locale.US) }
+    val nf = remember(midTrees) { NumberFormat.getIntegerInstance(java.util.Locale.US) }
 
-    val line = buildAnnotatedString {
+    // Build one line with an inline composable for the tree, bottom aligned
+    val text = buildAnnotatedString {
         withStyle(SpanStyle(color = color.copy(alpha = 0.9f), fontSize = 22.sp)) {
-            append("Equivalent to Planting ")
+            append("Equivalent to the Work of ")
         }
         withStyle(SpanStyle(color = color, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)) {
             append(nf.format(midTrees))
+            append(" ")
         }
-        withStyle(SpanStyle(fontSize = 50.sp)) { append(" 🌳") }
+        appendInlineContent("tree") // placeholder id
     }
 
+    val inline = mapOf(
+        "tree" to InlineTextContent(
+            placeholder = Placeholder(
+                width = 32.sp,            // size of the emoji box
+                height = 32.sp,
+                placeholderVerticalAlign = PlaceholderVerticalAlign.Bottom // <- bottom align
+            )
+        ) {
+            Text("🌳", fontSize = 50.sp)
+        }
+    )
+
     Text(
-        text = line,
+        text = text,
+        inlineContent = inline,
         textAlign = TextAlign.Center,
         maxLines = 1,
         softWrap = false,
