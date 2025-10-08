@@ -41,11 +41,6 @@ import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-// NEW imports for inline placeholder
-import androidx.compose.ui.text.InlineTextContent
-import androidx.compose.ui.text.Placeholder
-import androidx.compose.ui.text.PlaceholderVerticalAlign
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -108,7 +103,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                // Single bottom line: “Equivalent to Planting XXX 🌳” (emoji bottom-aligned)
+                // Single bottom line: “Equivalent to Planting XXX 🌳”
                 WhatThisMeansRowSingle(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -275,43 +270,29 @@ private fun FixedSizeSegFontWithGhost(
     }
 }
 
-/* ───────────────────── Single-line bottom row (baseline aligned tree) ───────────────────── */
+/* ───────────────────── Single-line bottom row ───────────────────── */
 
 @Composable
 private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Color) {
-    // Lifetime storage ~0.5–1.0 tCO2 per tree ⇒ ≈1–2 trees per ton; midpoint
+    // Lifetime storage ~0.5–1.0 tCO2 per tree ⇒ ≈1–2 trees per ton; show midpoint
     val tons = tco2 ?: 0.0
     val minTrees = ceil(tons / 1.0).toInt()
     val maxTrees = ceil(tons / 0.5).toInt()
     val midTrees = ((minTrees + maxTrees) / 2.0).roundToInt()
     val nf = remember(midTrees) { NumberFormat.getIntegerInstance(Locale.US) }
 
-    val text = buildAnnotatedString {
+    val line = buildAnnotatedString {
         withStyle(SpanStyle(color = color.copy(alpha = 0.9f), fontSize = 22.sp)) {
-            append("Equivalent to Planting ")
+            append("Equivalent to the Work of ")
         }
         withStyle(SpanStyle(color = color, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)) {
             append(nf.format(midTrees))
-            append(" ")
         }
-        appendInlineContent("tree") // inline, bottom-aligned
+        withStyle(SpanStyle(fontSize = 50.sp)) { append(" 🌳") }
     }
 
-    val inline = mapOf(
-        "tree" to InlineTextContent(
-            placeholder = Placeholder(
-                width = 32.sp,
-                height = 32.sp,
-                placeholderVerticalAlign = PlaceholderVerticalAlign.Bottom
-            )
-        ) {
-            Text("🌳", fontSize = 50.sp)
-        }
-    )
-
     Text(
-        text = text,
-        inlineContent = inline,
+        text = line,
         textAlign = TextAlign.Center,
         maxLines = 1,
         softWrap = false,
