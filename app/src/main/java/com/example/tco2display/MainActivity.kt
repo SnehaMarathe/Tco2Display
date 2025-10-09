@@ -60,7 +60,7 @@ class MainActivity : ComponentActivity() {
             val tco2 by vm.tco2.collectAsState()
 
             val bg = Color(0xFF000000)
-            val lit = Color(0xFFDAFFFF) // Color(0xFFFFFFFF)                 // bright white
+            val lit = Color(0xFFFFFFFF)                 // bright white Color(0xFFDAFFFF) Blue
             val ghost = Color.White.copy(alpha = 0.03f)  // faint segments
             val green = Color(0xFF39D353)               // last digit
 
