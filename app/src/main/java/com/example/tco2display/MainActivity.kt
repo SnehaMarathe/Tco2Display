@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
 
             val bg = Color(0xFF000000)
             val lit = Color(0xFFFFFFFF)                 // bright white
-            val ghost = Color.White.copy(alpha = 0.10f)  // faint segments
+            val ghost = Color.White.copy(alpha = 0.03f)  // faint segments
             val green = Color(0xFF39D353)               // last digit
 
             // Seven-segment style font (put at res/font/technology_bold.ttf)
@@ -282,17 +282,17 @@ private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Col
     val nf = remember(midTrees) { NumberFormat.getIntegerInstance(Locale.US) }
 
     val line = buildAnnotatedString {
-        withStyle(SpanStyle(color = color.copy(alpha = 0.9f), fontSize = 22.sp)) {append("As Valuable As ")}
+        withStyle(SpanStyle(color = color.copy(alpha = 0.9f), fontSize = 22.sp)) {append("The Impact Of ")}
         
-        // withStyle(SpanStyle(fontSize = 22.sp)) { append("🌎") }
+        // withStyle(SpanStyle(fontSize = 22.sp)) { append("🌎 🌳") }
 
         // withStyle(SpanStyle(color = color.copy(alpha = 0.9f), fontSize = 22.sp)) {append(" As ")}
 
         withStyle(SpanStyle(color = color, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)) {append(nf.format(midTrees))}
         
-        withStyle(SpanStyle(fontSize = 60.sp)) { append(" 🌳") }
+        withStyle(SpanStyle(fontSize = 22.sp)) { append(" Trees") }
         
-        withStyle(SpanStyle(color = color.copy(alpha = 0.9f), fontSize = 22.sp)) {append(" Towards Greener Future ")}
+        withStyle(SpanStyle(color = color.copy(alpha = 0.9f), fontSize = 22.sp)) {append(" For A Greener Future ")}
         
         withStyle(SpanStyle(fontSize = 22.sp)) { append("🌿") }
     }
