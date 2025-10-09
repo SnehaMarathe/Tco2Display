@@ -6,52 +6,45 @@ import com.example.tco2display.BuildConfig
 import com.example.tco2display.data.IntanglesRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
-/**
- * ViewModel that:
- * 1) Polls the server every ~2s for the latest total tCO2 saved.
- * 2) Estimates a per-second rate and "ticks" the value every 100ms between polls
- *    so the on-screen number feels live.
- */
 class Tco2ViewModel : ViewModel() {
 
+    // Read once; avoids repeated reflection/lookup
+    private val token: String = BuildConfig.INTANGLES_TOKEN.orEmpty()
+
+    // Use your existing repository as-is
     private val repository = IntanglesRepository()
 
     private val _tco2 = MutableStateFlow<Double?>(null)
     val tco2: StateFlow<Double?> = _tco2
 
-    // Internal state for interpolation
-    private var lastServerValue: Double? = null
-    private var lastServerAtNanos: Long = System.nanoTime()
-    private var estimatedRatePerSec: Double = 0.0
-
-    // Poll interval and UI tick interval
-    private val pollMillis = 2_000L   // fetch from API every 2s
-    private val tickMillis = 100L     // update UI every 100ms
+    // Poll cadence & retry timings
+    private val pollMillis = 2_000L
+    private val quickRetries = longArrayOf(250L, 500L, 1000L)
+    private val steadyRetry = 1_500L
 
     init {
-        startPollingAndTicking()
+        if (token.isNotBlank()) {
+            startPollingExact()
+        } else {
+            // No token available; keep null and do not spin aggressively
+        }
     }
 
-    private fun startPollingAndTicking() {
-        // 1) Server polling loop (every ~2s)
+    /**
+     * Polls the server every 2s and publishes EXACT values only.
+     * No interpolation, no client-side increments.
+     */
+    private fun startPollingExact() {
         viewModelScope.launch {
-            var backoff = 1_000L
+            var retryIndex = 0
             while (isActive) {
                 try {
-                    val token = BuildConfig.INTANGLES_TOKEN.orEmpty()
-                    if (token.isBlank()) {
-                        // No token → keep previous value and try again later
-                        delay(pollMillis)
-                        continue
-                    }
-
-                    val now = System.nanoTime()
-                    val newVal = repository.fetchAndSumTco2(
+                    val value = repository.fetchAndSumTco2(
                         token = token,
                         accId = "962759605811675136",
                         specIds = "966986020958502912,969208267156750336",
@@ -65,49 +58,20 @@ class Tco2ViewModel : ViewModel() {
                         lngDensity = 0.45
                     )
 
-                    // Update interpolation rate from last successful sample
-                    lastServerValue?.let { last ->
-                        val dt = (now - lastServerAtNanos) / 1_000_000_000.0
-                        if (dt > 0) {
-                            val dv = newVal - last
-                            estimatedRatePerSec = dv / dt
-                        }
-                    }
+                    // Publish exact server value
+                    _tco2.value = value
 
-                    lastServerValue = newVal
-                    lastServerAtNanos = now
-                    _tco2.value = newVal
-
-                    // Reset backoff on success
-                    backoff = 1_000L
-
+                    // Reset retry ramp and wait normal cadence
+                    retryIndex = 0
                     delay(pollMillis)
                 } catch (ce: CancellationException) {
                     throw ce
                 } catch (_: Exception) {
-                    // Network or parse error; back off briefly, then retry
-                    delay(backoff)
-                    backoff = (backoff * 2).coerceAtMost(10_000L)
+                    // Quick backoff on transient failure, then a steady retry interval
+                    val d = quickRetries.getOrNull(retryIndex) ?: steadyRetry
+                    if (retryIndex < quickRetries.lastIndex) retryIndex++
+                    delay(d)
                 }
-            }
-        }
-
-        // 2) Lightweight interpolation tick (every 100ms)
-        viewModelScope.launch {
-            while (isActive) {
-                val base = lastServerValue
-                if (base != null) {
-                    val dt = (System.nanoTime() - lastServerAtNanos) / 1_000_000_000.0
-                    // Project forward along the last observed rate
-                    val projected = base + estimatedRatePerSec * dt
-
-                    // Optional clamp: don’t drift more than a full poll interval ahead
-                    // val maxAhead = base + estimatedRatePerSec * (pollMillis / 1000.0)
-                    // _tco2.value = projected.coerceAtMost(maxAhead)
-
-                    _tco2.value = projected
-                }
-                delay(tickMillis)
             }
         }
     }
