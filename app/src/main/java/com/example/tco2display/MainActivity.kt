@@ -140,7 +140,7 @@ private fun TopLineWithBrand(modifier: Modifier, color: Color, lineThickness: Dp
            //     append(" Real-time ")
            // }
             withStyle(SpanStyle(color = color, fontSize = 28.sp, fontWeight = FontWeight.Bold)) {
-                append(" Real-time CO2 SAVED (Tons)")
+                append(" CO2 SAVED (Tons)")
             }
             withStyle(SpanStyle(color = color, fontSize = 22.sp, fontWeight = FontWeight.Normal)) {
                 append(" with ")
