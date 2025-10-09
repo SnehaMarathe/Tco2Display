@@ -38,7 +38,7 @@ class Tco2ViewModel : ViewModel() {
                             noDefaultFields = true,
                             proj = "total_fuel_consumed",
                             groups = "",
-                            lastloc = true,
+                            lastloc = false,
                             lngUnit = "kg",
                             lngDensity = 0.45
                         )
