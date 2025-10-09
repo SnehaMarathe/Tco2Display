@@ -137,18 +137,18 @@ private fun TopLineWithBrand(modifier: Modifier, color: Color, lineThickness: Dp
         Box(Modifier.weight(1f).height(lineThickness).background(color))
         val text = buildAnnotatedString {
             withStyle(SpanStyle(color = color, fontSize = 28.sp, fontWeight = FontWeight.Medium)) {
-                append("  CO2 ")
+                append("Live ")
             }
             withStyle(SpanStyle(color = color, fontSize = 28.sp, fontWeight = FontWeight.Bold)) {
-                append("SAVINGS")
+                append("CO2 SAVED (Tons)")
             }
             withStyle(SpanStyle(color = color, fontSize = 28.sp, fontWeight = FontWeight.Normal)) {
-                append(" in Tons with ")
+                append(" with ")
             }
             withStyle(SpanStyle(color = color, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)) {
                 append("BLUE ENERGY MOTORS")
             }
-            append("  ")
+            append(" ")
         }
         Text(text = text, textAlign = TextAlign.Center)
         Box(Modifier.weight(1f).height(lineThickness).background(color))
