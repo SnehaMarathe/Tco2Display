@@ -37,12 +37,12 @@ class Tco2ViewModel : ViewModel() {
                             token = token,
                             accId = "962759605811675136",
                             specIds = "966986020958502912,969208267156750336",
-                            psize = 300,            // keep as-is
+                            psize = 1000,            // keep as-is
                             lang = "en",
                             noDefaultFields = true,
                             proj = "total_fuel_consumed",
                             groups = "",
-                            lastloc = true,
+                            lastloc = false,
                             lngUnit = "kg",
                             lngDensity = 0.45
                         )
