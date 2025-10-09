@@ -6,6 +6,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
+import java.util.concurrent.TimeUnit
 
 class IntanglesRepository {
 
@@ -32,10 +33,15 @@ class IntanglesRepository {
         "User-Agent" to "android-okhttp/4.x"
     )
 
+    // ---- Faster, resilient HTTP client (reused) ----
     private val client: OkHttpClient by lazy {
         val log = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC }
         OkHttpClient.Builder()
             .addInterceptor(log)
+            .retryOnConnectionFailure(true)
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .callTimeout(12, TimeUnit.SECONDS)
             .build()
     }
 
@@ -47,6 +53,10 @@ class IntanglesRepository {
             .build()
             .create(IntanglesApi::class.java)
     }
+
+    // Cache detected fuel key across polls to avoid repeated deep scans
+    @Volatile
+    private var cachedFuelKey: String? = null
 
     /**
      * Streams pages and returns TOTAL tCO2 saved (in tonnes).
@@ -67,7 +77,7 @@ class IntanglesRepository {
         lngDensity: Double
     ): Double {
         var totalInput = 0.0
-        var fuelKey: String? = null
+        var fuelKey: String? = cachedFuelKey
         var pnum = 1
 
         while (true) {
@@ -90,6 +100,7 @@ class IntanglesRepository {
             if (fuelKey == null) {
                 val sample = rows.take(10)
                 fuelKey = detectFuelKey(sample) ?: error("Could not detect a fuel field.")
+                cachedFuelKey = fuelKey // cache for next polls
             }
 
             var pageSum = 0.0
@@ -127,7 +138,7 @@ class IntanglesRepository {
                     when (v) {
                         is JsonArray -> v.forEach { (it as? JsonObject)?.let(result::add) }
                         is JsonObject -> result.add(v)
-                        else -> { /* ignore non-object/list containers */ }
+                        else -> { /* ignore */ }
                     }
                 }
             }
@@ -146,10 +157,7 @@ class IntanglesRepository {
         "fuel"
     )
 
-    /**
-     * Walks all leaves and returns (dottedKey, valueElement).
-     * The 'else' branch keeps this exhaustive for sealed JsonElement hierarchy.
-     */
+    /** Walk all leaves and return (dottedKey, valueElement). */
     private fun walkKeys(elem: JsonElement, prefix: String = ""): Sequence<Pair<String, JsonElement>> = sequence {
         when (elem) {
             is JsonObject -> for ((k, v) in elem) {
@@ -157,13 +165,11 @@ class IntanglesRepository {
                 yieldAll(walkKeys(v, nk))
             }
             is JsonArray -> for (v in elem) yieldAll(walkKeys(v, prefix))
-            else -> yield(prefix to elem) // handles JsonPrimitive (JsonLiteral/JsonNull) and any other leaf
+            else -> yield(prefix to elem) // JsonPrimitive (string/number/bool/null)
         }
     }
 
-    /**
-     * Try to find a likely fuel key by preference and fuzzy match.
-     */
+    /** Try to find a likely fuel key by preference and fuzzy match. */
     private fun detectFuelKey(sampleRows: List<JsonObject>): String? {
         val lowers = buildSet {
             for (row in sampleRows) {
@@ -176,9 +182,7 @@ class IntanglesRepository {
         return lowers.firstOrNull { it.contains("fuel") && (it.contains("consum") || it.contains("total")) }
     }
 
-    /**
-     * Retrieve numeric value at dotted path; if strict lookup fails, deep-scan once.
-     */
+    /** Retrieve numeric value at dotted path; if strict lookup fails, deep-scan once. */
     private fun getValueByDotted(row: JsonObject, dotted: String): Double? {
         fun getStrict(obj: JsonElement?, parts: List<String>, i: Int): JsonElement? {
             if (obj == null) return null
@@ -192,11 +196,7 @@ class IntanglesRepository {
         return (leaf as? JsonPrimitive)?.toDoubleOrNullRelaxed()
     }
 
-    /**
-     * Parse JsonPrimitive to Double:
-     *  - numeric primitives
-     *  - strings like "1,234.56"
-     */
+    /** Parse JsonPrimitive to Double: numbers or strings like "1,234.56". */
     private fun JsonPrimitive.toDoubleOrNullRelaxed(): Double? {
         return if (isString) {
             this.content.trim().replace(",", "").toDoubleOrNull()
