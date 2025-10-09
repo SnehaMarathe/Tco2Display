@@ -33,7 +33,7 @@ class Tco2ViewModel : ViewModel() {
                             token = token,
                             accId = "962759605811675136",
                             specIds = "966986020958502912,969208267156750336",
-                            psize = 300,           // you can raise to 500/1000 to reduce pages
+                            psize = 1000,           // you can raise to 500/1000 to reduce pages
                             lang = "en",
                             noDefaultFields = true,
                             proj = "total_fuel_consumed",
