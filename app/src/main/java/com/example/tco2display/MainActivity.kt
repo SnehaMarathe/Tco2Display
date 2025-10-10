@@ -413,7 +413,7 @@ private fun DecimalAlignedLabels(
         ).size.width
 
         val tonsStyle = TextStyle(color = colorLeft, fontSize = 18.sp, fontWeight = FontWeight.Medium)
-        val kgStyle   = TextStyle(color = colorRight, fontSize = 16.sp, fontWeight = FontWeight.Normal)
+        val kgStyle   = TextStyle(color = colorRight, fontSize = 18.sp, fontWeight = FontWeight.Medium)
         val tonsW = measurer.measure("TONS", style = tonsStyle).size.width
         val kgW   = measurer.measure("KG",   style = kgStyle).size.width
 
@@ -426,10 +426,10 @@ private fun DecimalAlignedLabels(
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Box(Modifier.width(totalDp)) {
                 Box(Modifier.padding(start = tonsLeft)) {
-                    Text("TONS", style = tonsStyle)
+                    Text("TONS ", style = tonsStyle)
                 }
                 Box(Modifier.padding(start = kgLeft)) {
-                    Text("KG", style = kgStyle)
+                    Text("KG ", style = kgStyle)
                 }
             }
         }
