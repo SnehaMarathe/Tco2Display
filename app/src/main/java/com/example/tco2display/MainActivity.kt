@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
 
             val bg = Color(0xFF000000)
             val lit = Color(0xFFFFFFFF)                  // bright white
-            val ghost = Color.White.copy(alpha = 0.0005f)  // faint segments
+            val ghost = Color.White.copy(alpha = 0.01f)  // faint segments
             val green = Color(0xFF39D353)                // last digit (big)
             val lightGreen = Color(0xFF9FF7C6)           // first two decimals (light green)
 
@@ -156,13 +156,13 @@ private fun TopLineWithBrand(modifier: Modifier, color: Color, lineThickness: Dp
     ) {
         Box(Modifier.weight(1f).height(lineThickness).background(color))
         val text = buildAnnotatedString {
-            withStyle(SpanStyle(color = color, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)) {
+            withStyle(SpanStyle(color = color, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold)) {
                 append(" Blue Energy Motors")
             }
-            withStyle(SpanStyle(color = color, fontSize = 22.sp, fontWeight = FontWeight.Normal)) {
+            withStyle(SpanStyle(color = color, fontSize = 28.sp, fontWeight = FontWeight.Normal)) {
                 append(" : ")
             }
-            withStyle(SpanStyle(color = color, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)) {
+            withStyle(SpanStyle(color = color, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold)) {
                 append("Real-Time CO₂ Saved")
             }
             append("  ")
@@ -412,8 +412,8 @@ private fun DecimalAlignedLabels(
             constraints = constraints
         ).size.width
 
-        val tonsStyle = TextStyle(color = colorLeft, fontSize = 18.sp, fontWeight = FontWeight.Medium)
-        val kgStyle   = TextStyle(color = colorRight, fontSize = 18.sp, fontWeight = FontWeight.Medium)
+        val tonsStyle = TextStyle(color = colorLeft, fontSize = 22.sp, fontWeight = FontWeight.Medium)
+        val kgStyle   = TextStyle(color = colorRight, fontSize = 22.sp, fontWeight = FontWeight.Medium)
         val tonsW = measurer.measure("TONS  ", style = tonsStyle).size.width
         val kgW   = measurer.measure("KG  ",   style = kgStyle).size.width
 
