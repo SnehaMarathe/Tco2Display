@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
 
             val bg = Color(0xFF000000)
             val lit = Color(0xFFFFFFFF)                  // bright white
-            val ghost = Color.White.copy(alpha = 0.01f)  // faint segments
+            val ghost = Color.White.copy(alpha = 0.00f)  // faint segments
             val green = Color(0xFF39D353)                // last digit (big)
             val lightGreen = Color(0xFF9FF7C6)           // first two decimals (light green)
 
@@ -162,7 +162,7 @@ private fun TopLineWithBrand(modifier: Modifier, color: Color, lineThickness: Dp
             withStyle(SpanStyle(color = color, fontSize = 28.sp, fontWeight = FontWeight.Normal)) {
                 append(" : ")
             }
-            withStyle(SpanStyle(color = color, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold)) {
+            withStyle(SpanStyle(color = color, fontSize = 38.sp, fontWeight = FontWeight.Normal)) {
                 append("Real-Time CO₂ Saved")
             }
             append("  ")
@@ -314,10 +314,10 @@ private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Col
     val nf = remember(midTrees) { NumberFormat.getIntegerInstance(Locale.US) }
 
     val line = buildAnnotatedString {
-        withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 22.sp)) { append("Equivalent to ") }
-        withStyle(SpanStyle(color = color, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)) { append(nf.format(midTrees)) }
-        withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 22.sp)) { append(" Trees Working for a Greener Future ") }
-        withStyle(SpanStyle(fontSize = 22.sp)) { append("🌿") }
+        withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 32.sp)) { append("Equivalent to ") }
+        withStyle(SpanStyle(color = color, fontSize = 42.sp, fontWeight = FontWeight.ExtraBold)) { append(nf.format(midTrees)) }
+        withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 32.sp)) { append(" Trees Working for a Greener Future ") }
+        withStyle(SpanStyle(fontSize = 32.sp)) { append("🌿") }
     }
 
     Text(
