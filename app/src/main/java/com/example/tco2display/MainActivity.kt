@@ -331,115 +331,48 @@ private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Col
 }
 
 @Composable
-private fun DecimalAlignedLabels(
-    value: Double?,
-    fontFamily: FontFamily,
-    lastDigitScale: Float,
-    colorLeft: Color,
-    colorRight: Color,
-    fractionDigits: Int = 3
+fun DecimalAlignedLabels(
+    integersEndPx: Float,   // x (in pixels) at the RIGHT edge of the last integer digit
+    decimalsEndPx: Float,   // x (in pixels) at the RIGHT edge of the last decimal digit
+    baselineYPx: Float,     // y (in pixels) baseline of the number row (use same you already had)
+    color: Color
 ) {
+    val density = LocalDensity.current
     val measurer = rememberTextMeasurer()
 
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val density = LocalDensity.current
-        val maxWidthPx = with(density) { maxWidth.toPx() }.toInt()
-        val constraints = Constraints(maxWidth = maxWidthPx)
+    val style = TextStyle(
+        color = color.copy(alpha = 0.72f),
+        fontSize = 22.sp,
+        fontWeight = FontWeight.Medium
+    )
 
-        // Build the same display parts used by the big number
-        val display = if (value == null) "0.${"0".repeat(fractionDigits)}"
-        else String.format(Locale.US, "%.${fractionDigits}f", value)
+    // Measure label widths so we can position their LEFT edges = endX - labelWidth
+    val tonsWidthPx = measurer.measure("TONS", style = style).size.width
+    val kgWidthPx   = measurer.measure("KG",   style = style).size.width
 
-        val dotIdx = display.indexOf('.')
-        val rawInt = if (dotIdx >= 0) display.substring(0, dotIdx) else display
-        val trimmedInt = rawInt.replaceFirst(Regex("^0+(?!$)"), "").ifEmpty { "0" }
-        val frac = if (dotIdx >= 0) display.substring(dotIdx + 1) else "0".repeat(fractionDigits)
-        val firstTwo = frac.take(2)
-        val last = frac.last().toString()
+    val verticalGapPx = with(density) { 14.dp.toPx() }  // gap below the digits
 
-        // Find the same base size the counter uses
-        fun template(sp: Float) = buildAnnotatedString {
-            withStyle(SpanStyle(fontSize = sp.sp)) { append("8".repeat(trimmedInt.length)) }
-            withStyle(SpanStyle(fontSize = sp.sp)) { append("."); append("88") }
-            withStyle(SpanStyle(fontSize = (sp * lastDigitScale).sp)) { append("8") }
-        }
-        var lo = 24f; var hi = 2000f; var best = lo
-        repeat(14) {
-            val mid = (lo + hi) / 2f
-            val r = measurer.measure(
-                text = template(mid),
-                style = TextStyle(
-                    fontFamily = fontFamily,
-                    fontWeight = FontWeight.Bold,
-                    platformStyle = PlatformTextStyle(includeFontPadding = false),
-                    fontFeatureSettings = "tnum"
-                ),
-                maxLines = 1, softWrap = false, overflow = TextOverflow.Clip,
-                constraints = constraints
-            )
-            if (!r.didOverflowWidth) { best = mid; lo = mid } else hi = mid
-        }
-
-        // Total width of the number (for centering)
-        val totalStyled = buildAnnotatedString {
-            withStyle(SpanStyle(fontSize = best.sp)) { append(trimmedInt) }
-            withStyle(SpanStyle(fontSize = best.sp)) { append("."); append(firstTwo) }
-            withStyle(SpanStyle(fontSize = (best * lastDigitScale).sp)) { append(last) }
-        }
-        val totalW = measurer.measure(
-            totalStyled,
-            style = TextStyle(
-                fontFamily = fontFamily,
-                fontWeight = FontWeight.Bold,
-                platformStyle = PlatformTextStyle(includeFontPadding = false),
-                fontFeatureSettings = "tnum"
-            ),
-            maxLines = 1, softWrap = false, overflow = TextOverflow.Clip,
-            constraints = constraints
-        ).size.width
-
-        // Width up to (and including) the decimal point
-        val intDotW = measurer.measure(
-            buildAnnotatedString {
-                withStyle(SpanStyle(fontSize = best.sp)) { append(trimmedInt) }
-                withStyle(SpanStyle(fontSize = best.sp)) { append(".") }
-            },
-            style = TextStyle(
-                fontFamily = fontFamily,
-                fontWeight = FontWeight.Bold,
-                platformStyle = PlatformTextStyle(includeFontPadding = false),
-                fontFeatureSettings = "tnum"
-            ),
-            maxLines = 1, softWrap = false, overflow = TextOverflow.Clip,
-            constraints = constraints
-        ).size.width
-
-        val totalDp = with(density) { totalW.toDp() }
-        val intDotDp = with(density) { intDotW.toDp() }
-
-        // Overlay: TONS at left edge; KG anchored at the decimal start
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Box(Modifier.width(totalDp)) {
-                // Left label under the integer part
-                Text(
-                    text = "TONS",
-                    color = colorLeft,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium
+    Box(Modifier.fillMaxSize()) {
+        Text(
+            text = "TONS",
+            style = style,
+            modifier = Modifier.offset {
+                IntOffset(
+                    x = (integersEndPx - tonsWidthPx).toInt(),
+                    y = (baselineYPx + verticalGapPx).toInt()
                 )
-                // Right label aligned to start of fraction (after the dot)
-                Box(Modifier
-                    .fillMaxWidth()
-                    .padding(start = intDotDp)) {
-                    Text(
-                        text = "  KG",
-                        color = colorRight,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.align(Alignment.TopStart)
-                    )
-                }
             }
-        }
+        )
+        Text(
+            text = "KG",
+            style = style,
+            modifier = Modifier.offset {
+                IntOffset(
+                    x = (decimalsEndPx - kgWidthPx).toInt(),
+                    y = (baselineYPx + verticalGapPx).toInt()
+                )
+            }
+        )
     }
 }
+
