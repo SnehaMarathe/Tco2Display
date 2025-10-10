@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
 
             val bg = Color(0xFF000000)
             val lit = Color(0xFFFFFFFF)                  // bright white
-            val ghost = Color.White.copy(alpha = 0.00f)  // faint segments
+            val ghost = Color.White.copy(alpha = 0.0005f)  // faint segments
             val green = Color(0xFF39D353)                // last digit (big)
             val lightGreen = Color(0xFF9FF7C6)           // first two decimals (light green)
 
@@ -414,8 +414,8 @@ private fun DecimalAlignedLabels(
 
         val tonsStyle = TextStyle(color = colorLeft, fontSize = 18.sp, fontWeight = FontWeight.Medium)
         val kgStyle   = TextStyle(color = colorRight, fontSize = 18.sp, fontWeight = FontWeight.Medium)
-        val tonsW = measurer.measure("TONS", style = tonsStyle).size.width
-        val kgW   = measurer.measure("KG",   style = kgStyle).size.width
+        val tonsW = measurer.measure("TONS  ", style = tonsStyle).size.width
+        val kgW   = measurer.measure("KG  ",   style = kgStyle).size.width
 
         // Convert to dp
         val totalDp   = with(density) { totalW.toDp() }
@@ -426,10 +426,10 @@ private fun DecimalAlignedLabels(
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Box(Modifier.width(totalDp)) {
                 Box(Modifier.padding(start = tonsLeft)) {
-                    Text("TONS   ", style = tonsStyle)
+                    Text("TONS  ", style = tonsStyle)
                 }
                 Box(Modifier.padding(start = kgLeft)) {
-                    Text("KG   ", style = kgStyle)
+                    Text("KG  ", style = kgStyle)
                 }
             }
         }
