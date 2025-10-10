@@ -79,7 +79,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 4.dp),
-                    color = lit.copy(alpha = 0.92f)
+                    color = Color(0xFFDAFFFF) // ← was lit.copy(alpha = 0.92f) color = lit.copy(alpha = 0.92f)
                 )
 
                 Spacer(Modifier.height(12.dp))
@@ -346,7 +346,7 @@ private fun DecimalAlignedLabels(
         val maxWidthPx = with(density) { maxWidth.toPx() }.toInt()
         val constraints = Constraints(maxWidth = maxWidthPx)
 
-        // Format current display the same way as the big readout
+        // Build the same display parts used by the big number
         val display = if (value == null) "0.${"0".repeat(fractionDigits)}"
         else String.format(Locale.US, "%.${fractionDigits}f", value)
 
@@ -357,33 +357,30 @@ private fun DecimalAlignedLabels(
         val firstTwo = frac.take(2)
         val last = frac.last().toString()
 
-        // Size to the same width as the number uses (mirror the template binary-search quickly)
+        // Find the same base size the counter uses
         fun template(sp: Float) = buildAnnotatedString {
             withStyle(SpanStyle(fontSize = sp.sp)) { append("8".repeat(trimmedInt.length)) }
             withStyle(SpanStyle(fontSize = sp.sp)) { append("."); append("88") }
             withStyle(SpanStyle(fontSize = (sp * lastDigitScale).sp)) { append("8") }
         }
-
         var lo = 24f; var hi = 2000f; var best = lo
         repeat(14) {
             val mid = (lo + hi) / 2f
-            val res = measurer.measure(
-                template(mid),
+            val r = measurer.measure(
+                text = template(mid),
                 style = TextStyle(
                     fontFamily = fontFamily,
                     fontWeight = FontWeight.Bold,
                     platformStyle = PlatformTextStyle(includeFontPadding = false),
                     fontFeatureSettings = "tnum"
                 ),
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Clip,
+                maxLines = 1, softWrap = false, overflow = TextOverflow.Clip,
                 constraints = constraints
             )
-            if (!res.didOverflowWidth) { best = mid; lo = mid } else hi = mid
+            if (!r.didOverflowWidth) { best = mid; lo = mid } else hi = mid
         }
 
-        // Measure total width (to center the label row) and width up to the decimal point
+        // Total width of the number (for centering)
         val totalStyled = buildAnnotatedString {
             withStyle(SpanStyle(fontSize = best.sp)) { append(trimmedInt) }
             withStyle(SpanStyle(fontSize = best.sp)) { append("."); append(firstTwo) }
@@ -397,53 +394,52 @@ private fun DecimalAlignedLabels(
                 platformStyle = PlatformTextStyle(includeFontPadding = false),
                 fontFeatureSettings = "tnum"
             ),
-            maxLines = 1, softWrap = false, overflow = TextOverflow.Clip, constraints = constraints
+            maxLines = 1, softWrap = false, overflow = TextOverflow.Clip,
+            constraints = constraints
         ).size.width
 
-        val intDotStyled = buildAnnotatedString {
-            withStyle(SpanStyle(fontSize = best.sp)) { append(trimmedInt) }
-            withStyle(SpanStyle(fontSize = best.sp)) { append(".") }
-        }
+        // Width up to (and including) the decimal point
         val intDotW = measurer.measure(
-            intDotStyled,
+            buildAnnotatedString {
+                withStyle(SpanStyle(fontSize = best.sp)) { append(trimmedInt) }
+                withStyle(SpanStyle(fontSize = best.sp)) { append(".") }
+            },
             style = TextStyle(
                 fontFamily = fontFamily,
                 fontWeight = FontWeight.Bold,
                 platformStyle = PlatformTextStyle(includeFontPadding = false),
                 fontFeatureSettings = "tnum"
             ),
-            maxLines = 1, softWrap = false, overflow = TextOverflow.Clip, constraints = constraints
+            maxLines = 1, softWrap = false, overflow = TextOverflow.Clip,
+            constraints = constraints
         ).size.width
 
         val totalDp = with(density) { totalW.toDp() }
         val intDotDp = with(density) { intDotW.toDp() }
 
-        // Build a row exactly as wide as the digits and center it;
-        // place "TONS" at the left edge, then a spacer to the decimal start, then "KG".
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(
-                modifier = Modifier.width(totalDp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        // Overlay: TONS at left edge; KG anchored at the decimal start
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Box(Modifier.width(totalDp)) {
+                // Left label under the integer part
                 Text(
                     text = "TONS",
                     color = colorLeft,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Medium
                 )
-                Spacer(Modifier.width(intDotDp))
-                Text(
-                    text = "KG",
-                    color = colorRight,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium
-                )
+                // Right label aligned to start of fraction (after the dot)
+                Box(Modifier
+                    .fillMaxWidth()
+                    .padding(start = intDotDp)) {
+                    Text(
+                        text = "  KG",
+                        color = colorRight,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.align(Alignment.TopStart)
+                    )
+                }
             }
         }
     }
 }
-
