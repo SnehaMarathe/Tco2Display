@@ -60,9 +60,10 @@ class MainActivity : ComponentActivity() {
             val tco2 by vm.tco2.collectAsState()
 
             val bg = Color(0xFF000000)
-            val lit = Color(0xFFFFFFFF)                 // bright white Color(0xFFDAFFFF) Blue
+            val lit = Color(0xFFFFFFFF)                  // bright white
             val ghost = Color.White.copy(alpha = 0.03f)  // faint segments
-            val green = Color(0xFF39D353)               // last digit
+            val green = Color(0xFF39D353)                // last digit (big)
+            val lightGreen = Color(0xFF9FF7C6)           // first two decimals (light green)
 
             // Seven-segment style font (put at res/font/technology_bold.ttf)
             val segFont = FontFamily(Font(R.font.technology_bold, weight = FontWeight.Bold))
@@ -73,7 +74,7 @@ class MainActivity : ComponentActivity() {
                     .background(bg)
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                // Top banner — CO2 SAVINGS in Tons with BLUE ENERGY MOTORS —
+                // Top banner
                 TopLineWithBrand(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -83,27 +84,58 @@ class MainActivity : ComponentActivity() {
 
                 Spacer(Modifier.height(12.dp))
 
-                // Big digits centered (weighted area so the footer never overlaps)
+                // Center area: number (centered) + labels underneath (left-aligned)
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
                 ) {
-                    FixedSizeSegFontWithGhost(
-                        value = tco2,
-                        fontFamily = segFont,
-                        textColor = lit,
-                        ghostColor = ghost,
-                        lastDigitColor = green,
-                        baseMinSp = 24f,
-                        baseMaxSp = 2000f, // practically uncapped; width decides
-                        lastDigitScale = 1.22f,
-                        letterSpacingSp = 0f
-                    )
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // Big digits (centered)
+                        FixedSizeSegFontWithGhost(
+                            value = tco2,
+                            fontFamily = segFont,
+                            textColor = lit,
+                            ghostColor = ghost,
+                            firstTwoColor = lightGreen,  // ← make first two decimals light green
+                            lastDigitColor = green,
+                            baseMinSp = 24f,
+                            baseMaxSp = 2000f, // width decides
+                            lastDigitScale = 1.22f,
+                            letterSpacingSp = 0f
+                        )
+
+                        Spacer(Modifier.height(8.dp))
+
+                        // Units below number, left-aligned
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 6.dp),
+                            horizontalAlignment = Alignment.Start
+                        ) {
+                            Text(
+                                text = "TONS",
+                                color = lit.copy(alpha = 0.80f),
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "KG",
+                                color = lit.copy(alpha = 0.60f),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Normal
+                            )
+                        }
+                    }
                 }
 
-                // Single bottom line: “Equivalent to Planting XXX 🌳”
+                // Single bottom line: “Equivalent to …”
                 WhatThisMeansRowSingle(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -136,9 +168,6 @@ private fun TopLineWithBrand(modifier: Modifier, color: Color, lineThickness: Dp
     ) {
         Box(Modifier.weight(1f).height(lineThickness).background(color))
         val text = buildAnnotatedString {
-           // withStyle(SpanStyle(color = color, fontSize = 28.sp, fontWeight = FontWeight.Bold)) {
-           //     append(" Real-time ")
-           // }
             withStyle(SpanStyle(color = color, fontSize = 28.sp, fontWeight = FontWeight.Bold)) {
                 append(" CO2 SAVED (Tons)")
             }
@@ -163,6 +192,7 @@ private fun FixedSizeSegFontWithGhost(
     fontFamily: FontFamily,
     textColor: Color,
     ghostColor: Color,
+    firstTwoColor: Color,   // ← NEW: color for the first two decimals
     lastDigitColor: Color,
     baseMinSp: Float,
     baseMaxSp: Float,
@@ -230,11 +260,26 @@ private fun FixedSizeSegFontWithGhost(
             withStyle(SpanStyle(fontSize = (baseSizeSp * lastDigitScale).sp)) { append("8") }
         }
 
-        // Actual number (last digit large + green)
+        // Actual number:
+        //  - integer part = white
+        //  - '.' + first two decimals = **light green**
+        //  - last decimal = big **green**
         val actualText = buildAnnotatedString {
-            withStyle(SpanStyle(color = textColor, fontSize = baseSizeSp.sp)) { append(trimmedInt) }
-            withStyle(SpanStyle(color = textColor, fontSize = baseSizeSp.sp)) { append("."); append(firstTwo) }
-            withStyle(SpanStyle(color = lastDigitColor, fontSize = (baseSizeSp * lastDigitScale).sp)) { append(last) }
+            // integer
+            withStyle(SpanStyle(color = textColor, fontSize = baseSizeSp.sp)) {
+                append(trimmedInt)
+            }
+            // '.' + first two in light green
+            withStyle(SpanStyle(color = firstTwoColor, fontSize = baseSizeSp.sp)) {
+                append("."); append(firstTwo)
+            }
+            // last digit large + green
+            withStyle(
+                SpanStyle(
+                    color = lastDigitColor,
+                    fontSize = (baseSizeSp * lastDigitScale).sp
+                )
+            ) { append(last) }
         }
 
         Text(
@@ -274,7 +319,6 @@ private fun FixedSizeSegFontWithGhost(
 
 @Composable
 private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Color) {
-    // Lifetime storage ~0.5–1.0 tCO2 per tree ⇒ ≈1–2 trees per ton; show midpoint
     val tons = tco2 ?: 0.0
     val minTrees = ceil(tons / 1.0).toInt()
     val maxTrees = ceil(tons / 0.5).toInt()
@@ -282,21 +326,12 @@ private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Col
     val nf = remember(midTrees) { NumberFormat.getIntegerInstance(Locale.US) }
 
     val line = buildAnnotatedString {
-        withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 22.sp)) {append("Equivalent to ")}
-        
-        // withStyle(SpanStyle(fontSize = 22.sp)) { append("🌎 🌳") }
-
-        // withStyle(SpanStyle(color = color.copy(alpha = 0.9f), fontSize = 22.sp)) {append(" As ")}
-
-        withStyle(SpanStyle(color = color, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)) {append(nf.format(midTrees))}
-        
-        withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 22.sp)) {append(" Trees Working for a Greener Future ")}
-        
-        // withStyle(SpanStyle(color = color.copy(alpha = 0.9f), fontSize = 22.sp)) {append(" Towards Greener Future ")}
-        
+        withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 22.sp)) { append("Equivalent to ") }
+        withStyle(SpanStyle(color = color, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)) { append(nf.format(midTrees)) }
+        withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 22.sp)) { append(" Trees Working for a Greener Future ") }
         withStyle(SpanStyle(fontSize = 22.sp)) { append("🌿") }
     }
-    
+
     Text(
         text = line,
         textAlign = TextAlign.Center,
