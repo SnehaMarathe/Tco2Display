@@ -41,6 +41,8 @@ import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.roundToInt
 
+import androidx.compose.ui.graphics.graphicsLayer
+
 import androidx.compose.ui.text.InlineTextContent
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
@@ -340,49 +342,52 @@ private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Col
 
 @Composable
 private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Color) {
-    // If you still need the tree-count math, keep it; it's unused for this headline:
+    // (Optional) keep your tree math if you still use it elsewhere
     val tons = tco2 ?: 0.0
     val minTrees = ceil(tons / 1.0).toInt()
     val maxTrees = ceil(tons / 0.5).toInt()
     val midTrees = ((minTrees + maxTrees) / 2.0).roundToInt()
     val nf = remember(midTrees) { NumberFormat.getIntegerInstance(Locale.US) }
 
-    val truckId = "truck_right"
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            // Left chunk (will ellipsize first if needed)
+            Text(
+                text = "Forest on Wheels ",
+                color = Color(0xFFDAFFFF),
+                fontSize = 32.sp,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+                modifier = Modifier.alignByBaseline()
+            )
 
-    val line = buildAnnotatedString {
-        withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 32.sp)) {
-            append("Forest on Wheels ")
-            appendInlineContent(truckId, "[truck]")
-            append("🌳 — Driving a Greener Tomorrow 🌍🌿")
+            // Flipped truck emoji (faces right)
+            Text(
+                text = "🚛",
+                color = Color(0xFFDAFFFF),
+                fontSize = 32.sp,
+                modifier = Modifier
+                    .graphicsLayer(scaleX = -1f) // ← face right
+                    .alignByBaseline()
+            )
+
+            // Right chunk (will ellipsize at the end if needed)
+            Text(
+                text = "🌳 — Driving a Greener Tomorrow 🌍🌿",
+                color = Color(0xFFDAFFFF),
+                fontSize = 32.sp,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.alignByBaseline()
+            )
         }
     }
-
-    val inline = mapOf(
-        truckId to InlineTextContent(
-            placeholder = Placeholder(
-                width = 32.sp,
-                height = 32.sp,
-                placeholderVerticalAlign = PlaceholderVerticalAlign.Center
-            )
-        ) {
-            Text(
-                "🚛",
-                fontSize = 32.sp,
-                color = Color(0xFFDAFFFF),
-                modifier = Modifier.graphicsLayer(scaleX = -1f) // flip to face right
-            )
-        }
-    )
-
-    Text(
-        text = line,
-        inlineContent = inline,
-        textAlign = TextAlign.Center,
-        maxLines = 1,
-        softWrap = false,
-        overflow = TextOverflow.Ellipsis,
-        modifier = modifier
-    )
 }
 
 
