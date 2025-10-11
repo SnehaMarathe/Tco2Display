@@ -303,7 +303,7 @@ private fun FixedSizeSegFontWithGhost(
     }
 }
 
-/* ───────────────────── Single-line bottom row ───────────────────── */
+/* ───────────────────── Single-line bottom row ───────────────────── 
 
 @Composable
 private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Color) {
@@ -318,7 +318,7 @@ private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Col
         withStyle(SpanStyle(color = color, fontSize = 42.sp, fontWeight = FontWeight.ExtraBold)) { append(nf.format(midTrees)) }
         withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 32.sp)) { append(" Trees Working for a Greener Future ") }
         withStyle(SpanStyle(fontSize = 32.sp)) { append("🌿") }
-    }
+        //withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 32.sp)) { append("Forest on Wheels 🚛🌳 — Driving a Greener Tomorrow 🌍🌿") }
 
     Text(
         text = line,
@@ -329,6 +329,56 @@ private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Col
         modifier = modifier
     )
 }
+*/
+/* ───────────────────── Single-line bottom row ───────────────────── */
+
+@Composable
+private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Color) {
+    // If you still need the tree-count math, keep it; it's unused for this headline:
+    val tons = tco2 ?: 0.0
+    val minTrees = ceil(tons / 1.0).toInt()
+    val maxTrees = ceil(tons / 0.5).toInt()
+    val midTrees = ((minTrees + maxTrees) / 2.0).roundToInt()
+    val nf = remember(midTrees) { NumberFormat.getIntegerInstance(Locale.US) }
+
+    val truckId = "truck_right"
+
+    val line = buildAnnotatedString {
+        withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 32.sp)) {
+            append("Forest on Wheels ")
+            appendInlineContent(truckId, "[truck]")
+            append("🌳 — Driving a Greener Tomorrow 🌍🌿")
+        }
+    }
+
+    val inline = mapOf(
+        truckId to InlineTextContent(
+            placeholder = Placeholder(
+                width = 32.sp,
+                height = 32.sp,
+                placeholderVerticalAlign = PlaceholderVerticalAlign.Center
+            )
+        ) {
+            Text(
+                "🚛",
+                fontSize = 32.sp,
+                color = Color(0xFFDAFFFF),
+                modifier = Modifier.graphicsLayer(scaleX = -1f) // flip to face right
+            )
+        }
+    )
+
+    Text(
+        text = line,
+        inlineContent = inline,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+    )
+}
+
 
 @Composable
 private fun DecimalAlignedLabels(
