@@ -315,7 +315,8 @@ private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Col
 
     val line = buildAnnotatedString {
         withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 32.sp)) {
-            append("Forest🌳on Wheels — Driving a Greener Tomorrow 🌍🌿")
+            # append("Forest🌳on Wheels — Driving a Greener Tomorrow 🌍🌿")
+            append("🌿")
         }
     }
 
