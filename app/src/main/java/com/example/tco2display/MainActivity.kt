@@ -43,12 +43,6 @@ import kotlin.math.roundToInt
 
 import androidx.compose.ui.graphics.graphicsLayer
 
-import androidx.compose.ui.text.InlineTextContent
-import androidx.compose.ui.text.Placeholder
-import androidx.compose.ui.text.PlaceholderVerticalAlign
-import androidx.compose.ui.graphics.graphicsLayer
-
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -342,7 +336,7 @@ private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Col
 
 @Composable
 private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Color) {
-    // (Optional) keep your tree math if you still use it elsewhere
+    // (Optional) keep your tree math; not used in the headline text here
     val tons = tco2 ?: 0.0
     val minTrees = ceil(tons / 1.0).toInt()
     val maxTrees = ceil(tons / 0.5).toInt()
@@ -355,7 +349,6 @@ private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Col
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            // Left chunk (will ellipsize first if needed)
             Text(
                 text = "Forest on Wheels ",
                 color = Color(0xFFDAFFFF),
@@ -365,18 +358,14 @@ private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Col
                 overflow = TextOverflow.Clip,
                 modifier = Modifier.alignByBaseline()
             )
-
-            // Flipped truck emoji (faces right)
             Text(
                 text = "🚛",
                 color = Color(0xFFDAFFFF),
                 fontSize = 32.sp,
                 modifier = Modifier
-                    .graphicsLayer(scaleX = -1f) // ← face right
+                    .graphicsLayer(scaleX = -1f) // face right
                     .alignByBaseline()
             )
-
-            // Right chunk (will ellipsize at the end if needed)
             Text(
                 text = "🌳 — Driving a Greener Tomorrow 🌍🌿",
                 color = Color(0xFFDAFFFF),
