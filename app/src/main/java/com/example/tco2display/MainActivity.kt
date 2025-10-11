@@ -41,9 +41,8 @@ import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-import androidx.compose.ui.graphics.graphicsLayer
-
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -60,18 +59,19 @@ class MainActivity : ComponentActivity() {
         setContent {
             val vm: Tco2ViewModel = viewModel()
             val tco2 by vm.tco2.collectAsState()
-            // Add 1000 before displaying (UI-only)
-            val displayTco2 = (tco2 ?: 0.0) + 1000.0
 
-
+            // UI colors
             val bg = Color(0xFF000000)
             val lit = Color(0xFFFFFFFF)                  // bright white
-            val ghost = Color.White.copy(alpha = 0.00f)  // faint segments
+            val ghost = Color.White.copy(alpha = 0.00f)  // ghost segments off
             val green = Color(0xFF39D353)                // last digit (big)
-            val lightGreen = Color(0xFF9FF7C6)           // first two decimals (light green)
+            val lightGreen = Color(0xFF9FF7C6)           // first two decimals
 
             // Seven-segment style font (put at res/font/technology_bold.ttf)
             val segFont = FontFamily(Font(R.font.technology_bold, weight = FontWeight.Bold))
+
+            // Add 1000 before displaying (UI-only)
+            val displayTco2 = (tco2 ?: 0.0) + 1000.0
 
             Column(
                 modifier = Modifier
@@ -79,17 +79,17 @@ class MainActivity : ComponentActivity() {
                     .background(bg)
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                // Top banner
+                // Top banner (light blue like bottom row)
                 TopLineWithBrand(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 4.dp),
-                    color = Color(0xFFDAFFFF) // ← was lit.copy(alpha = 0.92f) color = lit.copy(alpha = 0.92f)
+                    color = Color(0xFFDAFFFF)
                 )
 
                 Spacer(Modifier.height(12.dp))
 
-                // Center area: number (centered) + labels underneath (left-aligned)
+                // Center area: number (centered) + labels underneath (aligned)
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -103,11 +103,11 @@ class MainActivity : ComponentActivity() {
                     ) {
                         // Big digits (centered)
                         FixedSizeSegFontWithGhost(
-                            value = displayTco2,          // was: tco2
+                            value = displayTco2,
                             fontFamily = segFont,
                             textColor = lit,
                             ghostColor = ghost,
-                            firstTwoColor = lightGreen,  // ← make first two decimals light green
+                            firstTwoColor = lightGreen,
                             lastDigitColor = green,
                             baseMinSp = 24f,
                             baseMaxSp = 2000f, // width decides
@@ -117,9 +117,9 @@ class MainActivity : ComponentActivity() {
 
                         Spacer(Modifier.height(8.dp))
 
-                        // Units below number, left-aligned
+                        // Units below number, aligned to the number geometry
                         DecimalAlignedLabels(
-                            value = displayTco2,          // was: tco2
+                            value = displayTco2,
                             fontFamily = segFont,
                             lastDigitScale = 1.22f,
                             colorLeft = lit.copy(alpha = 0.80f),
@@ -128,7 +128,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Single bottom line: “Equivalent to …”
+                // Bottom line (simple, no inline content)
                 WhatThisMeansRowSingle(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -185,7 +185,7 @@ private fun FixedSizeSegFontWithGhost(
     fontFamily: FontFamily,
     textColor: Color,
     ghostColor: Color,
-    firstTwoColor: Color,   // ← NEW: color for the first two decimals
+    firstTwoColor: Color,
     lastDigitColor: Color,
     baseMinSp: Float,
     baseMaxSp: Float,
@@ -221,7 +221,7 @@ private fun FixedSizeSegFontWithGhost(
         }
 
         // Binary-search base size; memoized by width and digit count
-        val baseSizeSp = remember(maxWidthPx, curIntDigits) {
+        val baseSizeSp = run {
             var low = baseMinSp
             var high = baseMaxSp
             var best = low
@@ -254,19 +254,13 @@ private fun FixedSizeSegFontWithGhost(
         }
 
         // Actual number:
-        //  - integer part = white
-        //  - '.' + first two decimals = **light green**
-        //  - last decimal = big **green**
         val actualText = buildAnnotatedString {
-            // integer
             withStyle(SpanStyle(color = textColor, fontSize = baseSizeSp.sp)) {
                 append(trimmedInt)
             }
-            // '.' + first two in light green
             withStyle(SpanStyle(color = firstTwoColor, fontSize = baseSizeSp.sp)) {
                 append("."); append(firstTwo)
             }
-            // last digit large + green
             withStyle(
                 SpanStyle(
                     color = lastDigitColor,
@@ -312,6 +306,7 @@ private fun FixedSizeSegFontWithGhost(
 
 @Composable
 private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Color) {
+    // Keep the math (not displayed) in case you want to use it later:
     val tons = tco2 ?: 0.0
     val minTrees = ceil(tons / 1.0).toInt()
     val maxTrees = ceil(tons / 0.5).toInt()
@@ -319,11 +314,10 @@ private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Col
     val nf = remember(midTrees) { NumberFormat.getIntegerInstance(Locale.US) }
 
     val line = buildAnnotatedString {
-        //withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 32.sp)) { append("Equivalent to ") }
-        //withStyle(SpanStyle(color = color, fontSize = 42.sp, fontWeight = FontWeight.ExtraBold)) { append(nf.format(midTrees)) }
-        //withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 32.sp)) { append(" Trees Working for a Greener Future ") }
-        //withStyle(SpanStyle(fontSize = 32.sp)) { append("🌿") }
-        withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 32.sp)) { append("Forest🌳on Wheels — Driving a Greener Tomorrow 🌍🌿") }
+        withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 32.sp)) {
+            append("Forest🌳on Wheels — Driving a Greener Tomorrow 🌍🌿")
+        }
+    }
 
     Text(
         text = line,
@@ -335,54 +329,7 @@ private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Col
     )
 }
 
-/* ───────────────────── Single-line bottom row ───────────────────── 
-
-@Composable
-private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Color) {
-    // (Optional) keep your tree math; not used in the headline text here
-    val tons = tco2 ?: 0.0
-    val minTrees = ceil(tons / 1.0).toInt()
-    val maxTrees = ceil(tons / 0.5).toInt()
-    val midTrees = ((minTrees + maxTrees) / 2.0).roundToInt()
-    val nf = remember(midTrees) { NumberFormat.getIntegerInstance(Locale.US) }
-
-    Box(modifier, contentAlignment = Alignment.Center) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = "Forest on Wheels ",
-                color = Color(0xFFDAFFFF),
-                fontSize = 32.sp,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Clip,
-                modifier = Modifier.alignByBaseline()
-            )
-            Text(
-                text = "🚛",
-                color = Color(0xFFDAFFFF),
-                fontSize = 32.sp,
-                modifier = Modifier
-                    .graphicsLayer(scaleX = -1f) // face right
-                    .alignByBaseline()
-            )
-            Text(
-                text = "🌳 — Driving a Greener Tomorrow 🌍🌿",
-                color = Color(0xFFDAFFFF),
-                fontSize = 32.sp,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.alignByBaseline()
-            )
-        }
-    }
-}
-
-*/
+/* ───────────────────── Labels aligned to number geometry ───────────────────── */
 
 @Composable
 private fun DecimalAlignedLabels(
@@ -489,5 +436,3 @@ private fun DecimalAlignedLabels(
         }
     }
 }
-
-
