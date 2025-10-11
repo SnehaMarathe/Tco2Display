@@ -60,6 +60,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             val vm: Tco2ViewModel = viewModel()
             val tco2 by vm.tco2.collectAsState()
+            // Add 1000 before displaying (UI-only)
+            val displayTco2 = (tco2 ?: 0.0) + 1000.0
+
 
             val bg = Color(0xFF000000)
             val lit = Color(0xFFFFFFFF)                  // bright white
@@ -100,7 +103,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         // Big digits (centered)
                         FixedSizeSegFontWithGhost(
-                            value = tco2,
+                            value = displayTco2,          // was: tco2
                             fontFamily = segFont,
                             textColor = lit,
                             ghostColor = ghost,
@@ -116,7 +119,7 @@ class MainActivity : ComponentActivity() {
 
                         // Units below number, left-aligned
                         DecimalAlignedLabels(
-                            value = tco2,
+                            value = displayTco2,          // was: tco2
                             fontFamily = segFont,
                             lastDigitScale = 1.22f,
                             colorLeft = lit.copy(alpha = 0.80f),
@@ -305,7 +308,7 @@ private fun FixedSizeSegFontWithGhost(
     }
 }
 
-/* ───────────────────── Single-line bottom row ───────────────────── 
+/* ───────────────────── Single-line bottom row ───────────────────── */
 
 @Composable
 private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Color) {
@@ -316,11 +319,11 @@ private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Col
     val nf = remember(midTrees) { NumberFormat.getIntegerInstance(Locale.US) }
 
     val line = buildAnnotatedString {
-        withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 32.sp)) { append("Equivalent to ") }
-        withStyle(SpanStyle(color = color, fontSize = 42.sp, fontWeight = FontWeight.ExtraBold)) { append(nf.format(midTrees)) }
-        withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 32.sp)) { append(" Trees Working for a Greener Future ") }
-        withStyle(SpanStyle(fontSize = 32.sp)) { append("🌿") }
-        //withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 32.sp)) { append("Forest on Wheels 🚛🌳 — Driving a Greener Tomorrow 🌍🌿") }
+        //withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 32.sp)) { append("Equivalent to ") }
+        //withStyle(SpanStyle(color = color, fontSize = 42.sp, fontWeight = FontWeight.ExtraBold)) { append(nf.format(midTrees)) }
+        //withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 32.sp)) { append(" Trees Working for a Greener Future ") }
+        //withStyle(SpanStyle(fontSize = 32.sp)) { append("🌿") }
+        withStyle(SpanStyle(color = Color(0xFFDAFFFF), fontSize = 32.sp)) { append("Forest🌳on Wheels — Driving a Greener Tomorrow 🌍🌿") }
 
     Text(
         text = line,
@@ -331,8 +334,8 @@ private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Col
         modifier = modifier
     )
 }
-*/
-/* ───────────────────── Single-line bottom row ───────────────────── */
+
+/* ───────────────────── Single-line bottom row ───────────────────── 
 
 @Composable
 private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Color) {
@@ -379,6 +382,7 @@ private fun WhatThisMeansRowSingle(modifier: Modifier, tco2: Double?, color: Col
     }
 }
 
+*/
 
 @Composable
 private fun DecimalAlignedLabels(
