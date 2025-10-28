@@ -70,8 +70,8 @@ class MainActivity : ComponentActivity() {
             // Seven-segment style font (put at res/font/technology_bold.ttf)
             val segFont = FontFamily(Font(R.font.technology_bold, weight = FontWeight.Bold))
 
-            // Add 1000 before displaying (UI-only)
-            val displayTco2 = (tco2 ?: 0.0) + 1000.0
+            // Add 1000 before displaying (UI-only) : Changed back to realistic value
+            val displayTco2 = (tco2 ?: 0.0) + 000.0
 
             Column(
                 modifier = Modifier
